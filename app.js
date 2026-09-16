@@ -918,3 +918,21 @@ document.addEventListener("DOMContentLoaded",()=>{
  $("catalogo-busca")?.addEventListener("input",renderCatalogoBase);$("catalogo-atualizar")?.addEventListener("click",loadCatalogoBase);$("catalogo-novo")?.addEventListener("click",()=>catalogoForm({}));
  setTimeout(()=>{const h=document.querySelector("#page-materiais .page-header, #page-materiais .panel-head");if(h&&!$("abrir-catalogo-empresa")){const b=document.createElement("button");b.id="abrir-catalogo-empresa";b.className="btn secondary";b.textContent="Catálogo Core-Orça";b.onclick=abrirCatalogoEmpresa;h.appendChild(b);}},600);
 });
+
+
+/* V15.1 — botão fixo do Catálogo Core-Orça na página Materiais */
+document.addEventListener("DOMContentLoaded",()=>{
+ const catalogButton=$("abrir-catalogo-empresa");
+ if(catalogButton){
+   catalogButton.onclick=abrirCatalogoEmpresa;
+   // O botão segue a permissão de escrita do módulo Materiais.
+   const applyCatalogPermission=()=>{
+     const ctx=(typeof currentProfile!=="undefined" ? currentProfile : null);
+     if(!ctx){ catalogButton.classList.remove("hidden"); return; }
+     const manager=ctx.tipo==="gerente";
+     const allowed=manager || (typeof can==="function" && can("materiais","write"));
+     catalogButton.classList.toggle("hidden",!allowed);
+   };
+   setTimeout(applyCatalogPermission,250);
+ }
+});

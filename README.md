@@ -1,13 +1,21 @@
-# Core-Orça V15 — Catálogo Base
+# Core-Orça V15.1 — Correção do botão Catálogo
 
-Inclui 1311 materiais LM-0001 a LM-1311 em um catálogo central compartilhado.
+Correção de frontend sobre a V15.
 
-O catálogo guarda os dados-base. Cada empresa importa os itens que deseja e mantém separadamente estoque, custo, preço de venda e margem.
+## Corrigido
+- O botão **Catálogo Core-Orça** agora fica diretamente no HTML da página Materiais.
+- Ele aparece junto de **Importar CSV** e **+ Material**.
+- O clique abre `abrirCatalogoEmpresa()`.
+- Gerente tem acesso; colaborador depende da permissão de escrita em Materiais.
+- Os 1.311 materiais do Catálogo Base já carregados no Supabase são preservados.
 
 ## Instalação
-1. Execute `supabase-v15.sql` no SQL Editor.
-2. Substitua `index.html`, `style.css` e `app.js` no GitHub.
-3. Commit e Ctrl+F5.
-4. Não é necessário republicar a Edge Function.
+Não execute SQL novamente e não altere a Edge Function.
 
-O Administrador da plataforma recebe a página **Catálogo Base**. Empresas recebem o botão **Catálogo Core-Orça** em Materiais, com importação seletiva ou completa.
+Substitua no GitHub:
+- `index.html`
+- `app.js`
+
+O `style.css` pode permanecer o da V15.
+
+Depois faça commit, aguarde o GitHub Pages e pressione Ctrl+F5.

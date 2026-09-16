@@ -48,3 +48,94 @@
 .item-search-wrap{position:relative}.suggestions{z-index:100}
 @media(max-width:850px){.contact-row,.payment-row,.service-material-row{grid-template-columns:1fr}.permission-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.permission-grid{grid-template-columns:1fr}}
+
+
+/* =========================================================
+   CORE-ORCA V8 — CORREÇÃO DO MENU LATERAL
+   ========================================================= */
+
+.sidebar{
+  height:100vh;
+  height:100dvh;
+  min-height:0;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.sidebar .brand{
+  flex:0 0 auto;
+}
+
+/* IMPORTANTE:
+   O nav deixa de ser grid. Assim os botões não são esticados
+   verticalmente quando poucos itens estão visíveis. */
+.sidebar nav{
+  display:flex !important;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
+  gap:6px;
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:0 4px 8px 0;
+  margin:0;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:#4b5563 transparent;
+}
+
+.sidebar nav::-webkit-scrollbar{
+  width:7px;
+}
+
+.sidebar nav::-webkit-scrollbar-track{
+  background:transparent;
+}
+
+.sidebar nav::-webkit-scrollbar-thumb{
+  background:#4b5563;
+  border-radius:999px;
+}
+
+.sidebar .nav-item{
+  display:block;
+  flex:0 0 auto;
+  width:100%;
+  min-height:42px;
+  height:auto;
+  margin:0;
+  white-space:normal;
+  line-height:1.25;
+}
+
+.sidebar-footer{
+  flex:0 0 auto;
+  margin-top:0 !important;
+  padding-top:12px;
+  background:#111827;
+}
+
+/* Mantém e-mail e botão Sair sempre acessíveis. */
+.sidebar-footer #user-email{
+  display:block;
+  max-height:42px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+@media(max-width:850px){
+  .sidebar{
+    top:0;
+    bottom:0;
+    height:100vh;
+    height:100dvh;
+    max-height:100dvh;
+  }
+
+  .sidebar nav{
+    -webkit-overflow-scrolling:touch;
+  }
+}

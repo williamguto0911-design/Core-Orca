@@ -1,20 +1,35 @@
-# Sistema de Gestão de Manutenção Elétrica
+# Core-Orca V2
 
-V1: clientes, materiais, estoque, login e importação CSV.
+## O que foi adicionado
+- Cadastro de Serviços.
+- Orçamentos com materiais e serviços.
+- Busca parcial de materiais/serviços ao montar orçamento e OS.
+- Ordens de Serviço.
+- Conversão de orçamento em OS.
+- Baixa automática de materiais do estoque ao concluir uma OS.
+- Layout responsivo para computador e celular.
+- Mantém Clientes, Materiais, Estoque e importação CSV da V1.
 
-## Instalação
+## INSTALAÇÃO — faça nesta ordem
+1. No Supabase, abra **SQL Editor**.
+2. Execute todo o arquivo `supabase-v2.sql`.
+3. No GitHub, substitua `index.html`, `style.css` e `app.js` pelos arquivos deste ZIP.
+4. Faça commit na branch `main`.
+5. Aguarde o GitHub Pages publicar.
+6. Abra o site com Ctrl+F5.
 
-1. Crie/abra o projeto no Supabase.
-2. Abra **SQL Editor**.
-3. Cole e execute `supabase.sql`.
-4. No Supabase, crie um usuário em **Authentication > Users > Add user**.
-5. Suba `index.html`, `style.css` e `app.js` para o GitHub.
-6. Ative GitHub Pages em **Settings > Pages > Deploy from branch**.
-7. Abra o endereço do GitHub Pages e faça login com o usuário criado.
+## Importante
+- Não apague as tabelas da V1.
+- O SQL foi feito para acrescentar a V2.
+- Ao concluir uma OS, o banco verifica o estoque. Se faltar material, a OS não é concluída e nenhuma baixa parcial é feita.
+- Uma OS já baixada não baixa o estoque novamente.
+- O `service_role` não é usado no navegador.
 
-## CSV
+## Materiais CSV
+Cabeçalhos aceitos:
+codigo,nome,descricao,categoria,fabricante,unidade,estoque_atual,estoque_minimo,custo,preco_venda
 
-O importador aceita `,` ou `;` e tenta reconhecer:
-`codigo;nome;descricao;categoria;fabricante;unidade;estoque_atual;estoque_minimo;custo;preco_venda`
+Também aceita `;` como separador.
 
-Para códigos existentes, o importador atualiza o material.
+## Próxima etapa sugerida
+PDF de orçamento/OS, fotos, assinatura do cliente, agenda e financeiro.

@@ -59,7 +59,23 @@ function renderCurrent(){
   if(currentPage==="admin-plataforma")renderSaasAdmin();
 }
 async function loadClientes(){const {data,error}=await sb.from("clientes").select("*").eq("ativo",true).order("nome");if(error)return toast("Clientes: "+error.message);clientes=data||[]}
-async function loadMateriais(){const {data,error}=await sb.from("materiais").select("*").eq("ativo",true).order("nome");if(error)return toast("Materiais: "+error.message);materiais=data||[]}
+async function loadMateriais(){
+ try{
+   let all=[],from=0,pageSize=1000;
+   while(true){
+     const {data,error}=await sb.from("materiais").select("*").eq("ativo",true).order("nome").range(from,from+pageSize-1);
+     if(error)throw error;
+     const rows=data||[];
+     all.push(...rows);
+     if(rows.length<pageSize)break;
+     from+=pageSize;
+   }
+   materiais=all;
+ }catch(error){
+   console.error("Materiais:",error);
+   toast("Materiais: "+error.message);
+ }
+}
 async function loadServicos(){const {data,error}=await sb.from("servicos").select("*").eq("ativo",true).order("nome");if(error)return toast("Serviços: execute o SQL da V2 no Supabase. "+error.message);servicos=data||[]}
 async function loadOrcamentos(){const {data,error}=await sb.from("orcamentos").select("*,clientes(nome)").order("created_at",{ascending:false});if(error){orcamentos=[];return}orcamentos=data||[]}
 async function loadOrdens(){const {data,error}=await sb.from("ordens_servico").select("*,clientes(nome)").order("created_at",{ascending:false});if(error){ordens=[];return}ordens=data||[]}
@@ -879,7 +895,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
 /* V15 — Catálogo Base */
 async function loadCatalogoBase(){
- const {data,error}=await sb.from("catalogo_materiais_base").select("*").order("codigo");
+ const data=await fetchAllRows("catalogo_materiais_base","*","codigo",true,1000), error=null;
  if(error)return toast("Erro ao carregar catálogo: "+error.message);
  catalogoBase=data||[];renderCatalogoBase();
 }

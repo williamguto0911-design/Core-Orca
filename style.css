@@ -202,3 +202,5 @@
 }
 .searchable-option:hover,.searchable-option:focus,.searchable-option.selected{background:#f1f5f9;outline:none}
 .searchable-empty{padding:10px;color:#6b7280}
+
+.catalog-check-list{max-height:420px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;margin:10px 0}.catalog-check{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #eef2f7;cursor:pointer}.catalog-check span{display:flex;flex-direction:column}.catalog-check small{color:#6b7280}.catalog-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}

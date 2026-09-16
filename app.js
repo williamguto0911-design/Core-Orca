@@ -1,3 +1,4 @@
+let catalogoBase=[];
 const SUPABASE_URL = "https://vihhktumvtfdcnthekic.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhrdHVtdnRmZGNudGhla2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjY5NTksImV4cCI6MjEwNTE0Mjk1OX0.F6dsoPwigniSvr6CwA8S91tr7KAH-utME0uAwr4etpo";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -874,4 +875,46 @@ const searchableSelectObserver=new MutationObserver(mutations=>{
 document.addEventListener("DOMContentLoaded",()=>{
  enhanceAllSelects();
  searchableSelectObserver.observe(document.body,{childList:true,subtree:true});
+});
+
+/* V15 — Catálogo Base */
+async function loadCatalogoBase(){
+ const {data,error}=await sb.from("catalogo_materiais_base").select("*").order("codigo");
+ if(error)return toast("Erro ao carregar catálogo: "+error.message);
+ catalogoBase=data||[];renderCatalogoBase();
+}
+function renderCatalogoBase(){
+ const t=$("catalogo-table");if(!t)return;
+ const n=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+ const q=n($("catalogo-busca")?.value);
+ const rows=catalogoBase.filter(x=>n([x.codigo,x.descricao,x.categoria,x.fabricante].join(" ")).includes(q));
+ t.innerHTML=rows.map(x=>`<tr><td><b>${esc(x.codigo)}</b></td><td>${esc(x.descricao)}</td><td>${esc(x.categoria||"")}</td><td>${esc(x.unidade||"")}</td><td>${esc(x.fabricante||"")}</td><td><div class="action-group"><button class="action-btn" onclick="catalogoForm(catalogoBase.find(y=>y.id==='${x.id}'))">Editar</button><button class="action-btn danger" onclick="deleteCatalogoItem('${x.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum material encontrado.</td></tr>';
+}
+function catalogoForm(x={}){
+ openModal(x.id?"Editar material base":"Novo material base",`<form id="catalogo-form"><div class="form-grid">
+ <label>Código*<input id="cb-codigo" required value="${esc(x.codigo||"")}"></label><label>Descrição*<input id="cb-descricao" required value="${esc(x.descricao||"")}"></label>
+ <label>Categoria<input id="cb-categoria" value="${esc(x.categoria||"")}"></label><label>Subcategoria<input id="cb-subcategoria" value="${esc(x.subcategoria||"")}"></label>
+ <label>Unidade<input id="cb-unidade" value="${esc(x.unidade||"unidade")}"></label><label>Fabricante<input id="cb-fabricante" value="${esc(x.fabricante||"")}"></label>
+ <label>Modelo<input id="cb-modelo" value="${esc(x.modelo||"")}"></label><label class="span-2">Especificação<textarea id="cb-especificacao">${esc(x.especificacao||"")}</textarea></label>
+ <label class="span-2">Observações<textarea id="cb-observacoes">${esc(x.observacoes||"")}</textarea></label></div>
+ <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("catalogo-form").onsubmit=async e=>{e.preventDefault();const v={codigo:$("cb-codigo").value.trim(),descricao:$("cb-descricao").value.trim(),categoria:$("cb-categoria").value.trim()||null,subcategoria:$("cb-subcategoria").value.trim()||null,unidade:$("cb-unidade").value.trim()||"unidade",fabricante:$("cb-fabricante").value.trim()||null,modelo:$("cb-modelo").value.trim()||null,especificacao:$("cb-especificacao").value.trim()||null,observacoes:$("cb-observacoes").value.trim()||null};const r=x.id?await sb.from("catalogo_materiais_base").update(v).eq("id",x.id):await sb.from("catalogo_materiais_base").insert(v);if(r.error)return toast(r.error.message);closeModal();await loadCatalogoBase();};
+}
+async function deleteCatalogoItem(id){
+ if(!confirm("Excluir este item do Catálogo Base? Isso não apaga cópias já importadas pelas empresas."))return;
+ const {error}=await sb.from("catalogo_materiais_base").delete().eq("id",id);if(error)return toast(error.message);await loadCatalogoBase();
+}
+async function abrirCatalogoEmpresa(){
+ const {data,error}=await sb.rpc("listar_catalogo_disponivel_v15");if(error)return toast(error.message);const lista=data||[];
+ openModal("Adicionar do Catálogo Core-Orça",`<div><input id="cat-busca" placeholder="Pesquisar no catálogo..."><div class="catalog-actions"><button type="button" id="cat-marcar" class="btn secondary">Selecionar visíveis</button><button type="button" id="cat-todos" class="btn secondary">Importar catálogo completo</button></div><div id="cat-list" class="catalog-check-list"></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button type="button" id="cat-importar" class="btn primary">Adicionar selecionados</button></div></div>`);
+ const n=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();let vis=[];
+ function draw(){const q=n($("cat-busca").value);vis=lista.filter(x=>n([x.codigo,x.descricao,x.categoria,x.fabricante].join(" ")).includes(q));$("cat-list").innerHTML=vis.map(x=>`<label class="catalog-check"><input type="checkbox" value="${x.id}" ${x.ja_importado?"disabled":""}><span><b>${esc(x.codigo)}</b> — ${esc(x.descricao)}<small>${esc(x.categoria||"")}${x.ja_importado?" • Já adicionado":""}</small></span></label>`).join("");}
+ $("cat-busca").oninput=draw;$("cat-marcar").onclick=()=>document.querySelectorAll("#cat-list input:not(:disabled)").forEach(c=>c.checked=true);
+ $("cat-importar").onclick=async()=>{const ids=[...document.querySelectorAll("#cat-list input:checked")].map(c=>c.value);if(!ids.length)return toast("Selecione ao menos um material.");const r=await sb.rpc("importar_catalogo_v15",{p_catalogo_ids:ids});if(r.error)return toast(r.error.message);closeModal();await refreshAll();toast(`${r.data||0} material(is) adicionado(s).`);};
+ $("cat-todos").onclick=async()=>{if(!confirm("Importar o catálogo completo para esta empresa?"))return;const r=await sb.rpc("importar_catalogo_completo_v15");if(r.error)return toast(r.error.message);closeModal();await refreshAll();toast(`${r.data||0} material(is) adicionado(s).`);};draw();
+}
+document.addEventListener("click",e=>{if(e.target.closest?.('[data-page="catalogo-base"]'))setTimeout(loadCatalogoBase,0);});
+document.addEventListener("DOMContentLoaded",()=>{
+ $("catalogo-busca")?.addEventListener("input",renderCatalogoBase);$("catalogo-atualizar")?.addEventListener("click",loadCatalogoBase);$("catalogo-novo")?.addEventListener("click",()=>catalogoForm({}));
+ setTimeout(()=>{const h=document.querySelector("#page-materiais .page-header, #page-materiais .panel-head");if(h&&!$("abrir-catalogo-empresa")){const b=document.createElement("button");b.id="abrir-catalogo-empresa";b.className="btn secondary";b.textContent="Catálogo Core-Orça";b.onclick=abrirCatalogoEmpresa;h.appendChild(b);}},600);
 });

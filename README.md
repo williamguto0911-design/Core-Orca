@@ -1,21 +1,23 @@
-# Core-Orça V15.1 — Correção do botão Catálogo
+# Core-Orça V15.2
 
-Correção de frontend sobre a V15.
+Correção da importação completa do Catálogo Base.
 
-## Corrigido
-- O botão **Catálogo Core-Orça** agora fica diretamente no HTML da página Materiais.
-- Ele aparece junto de **Importar CSV** e **+ Material**.
-- O clique abre `abrirCatalogoEmpresa()`.
-- Gerente tem acesso; colaborador depende da permissão de escrita em Materiais.
-- Os 1.311 materiais do Catálogo Base já carregados no Supabase são preservados.
+## O que muda
+A importação dos 1.311 materiais agora acontece inteiramente dentro do PostgreSQL/Supabase, sem depender de uma lista retornada ao navegador.
+
+A função:
+- preserva os materiais já existentes;
+- não duplica códigos;
+- importa somente os itens faltantes;
+- retorna quantos foram adicionados;
+- retorna o progresso `presentes / total`;
+- pode ser executada novamente com segurança.
 
 ## Instalação
-Não execute SQL novamente e não altere a Edge Function.
+1. Execute `supabase-v15.2.sql` no SQL Editor do Supabase.
+2. Substitua somente `app.js` no GitHub pelo arquivo desta versão.
+3. Faça commit, aguarde o GitHub Pages e pressione Ctrl+F5.
+4. Entre como Gerente da empresa.
+5. Materiais → Catálogo Core-Orça → Importar catálogo completo.
 
-Substitua no GitHub:
-- `index.html`
-- `app.js`
-
-O `style.css` pode permanecer o da V15.
-
-Depois faça commit, aguarde o GitHub Pages e pressione Ctrl+F5.
+Se a empresa tinha 1.000 itens do catálogo, a expectativa é que sejam inseridos apenas os 311 faltantes. Se existir material próprio, ele continua separado e não entra na contagem 1.311/1.311 do catálogo.

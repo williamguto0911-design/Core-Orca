@@ -911,7 +911,18 @@ async function abrirCatalogoEmpresa(){
  function draw(){const q=n($("cat-busca").value);vis=lista.filter(x=>n([x.codigo,x.descricao,x.categoria,x.fabricante].join(" ")).includes(q));$("cat-list").innerHTML=vis.map(x=>`<label class="catalog-check"><input type="checkbox" value="${x.id}" ${x.ja_importado?"disabled":""}><span><b>${esc(x.codigo)}</b> — ${esc(x.descricao)}<small>${esc(x.categoria||"")}${x.ja_importado?" • Já adicionado":""}</small></span></label>`).join("");}
  $("cat-busca").oninput=draw;$("cat-marcar").onclick=()=>document.querySelectorAll("#cat-list input:not(:disabled)").forEach(c=>c.checked=true);
  $("cat-importar").onclick=async()=>{const ids=[...document.querySelectorAll("#cat-list input:checked")].map(c=>c.value);if(!ids.length)return toast("Selecione ao menos um material.");const r=await sb.rpc("importar_catalogo_v15",{p_catalogo_ids:ids});if(r.error)return toast(r.error.message);closeModal();await refreshAll();toast(`${r.data||0} material(is) adicionado(s).`);};
- $("cat-todos").onclick=async()=>{if(!confirm("Importar o catálogo completo para esta empresa?"))return;const r=await sb.rpc("importar_catalogo_completo_v15");if(r.error)return toast(r.error.message);closeModal();await refreshAll();toast(`${r.data||0} material(is) adicionado(s).`);};draw();
+ $("cat-todos").onclick=async()=>{
+   if(!confirm("Importar todos os materiais faltantes do Catálogo Core-Orça para esta empresa?"))return;
+   const r=await sb.rpc("importar_catalogo_completo_v152");
+   if(r.error)return toast("Erro na importação: "+r.error.message);
+   const info=Array.isArray(r.data)?r.data[0]:r.data;
+   closeModal();
+   await refreshAll();
+   const adicionados=Number(info?.adicionados||0);
+   const presentes=Number(info?.presentes||0);
+   const total=Number(info?.total_catalogo||0);
+   toast(`${adicionados} material(is) importado(s). Catálogo: ${presentes}/${total}.`);
+ };draw();
 }
 document.addEventListener("click",e=>{if(e.target.closest?.('[data-page="catalogo-base"]'))setTimeout(loadCatalogoBase,0);});
 document.addEventListener("DOMContentLoaded",()=>{

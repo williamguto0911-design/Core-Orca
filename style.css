@@ -154,3 +154,16 @@
 .saas-owner-card div{display:flex;flex-direction:column;gap:4px}
 .saas-owner-card strong{font-size:15px}
 @media(max-width:650px){.saas-owner-card{grid-template-columns:1fr}}
+
+/* V11 — licenças, senha temporária e ações administrativas */
+.action-group{display:flex;gap:6px;flex-wrap:wrap}
+.btn.danger,.action-btn.danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
+.btn.warning,.action-btn.warning{background:#b45309;color:#fff;border-color:#b45309}
+.temp-password-box{padding:16px;border:1px solid #86efac;background:#f0fdf4;border-radius:12px;margin:12px 0}
+.temp-password{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:20px;font-weight:800;letter-spacing:.5px;word-break:break-all}
+.license-list{display:grid;gap:10px;margin-top:12px}
+.license-row{display:grid;grid-template-columns:90px 120px 1fr auto;gap:10px;align-items:center;padding:12px;border:1px solid #e5e7eb;border-radius:10px}
+.license-active{color:#15803d;font-weight:700}
+.license-blocked{color:#b91c1c;font-weight:700}
+.force-password-note{padding:12px;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;margin-bottom:12px}
+@media(max-width:750px){.license-row{grid-template-columns:1fr}.action-group{width:100%}}

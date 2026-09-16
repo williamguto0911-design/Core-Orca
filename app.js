@@ -18,7 +18,14 @@ async function init(){
   sb.auth.onAuthStateChange(async(event,session)=>{if(session)await showApp(session);else showLogin()});
 }
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
-async function showApp(session){currentSession=session;$("login-screen").classList.add("hidden");$("app").classList.remove("hidden");$("user-email").textContent=session.user.email||"";await refreshAll()}
+async function showApp(session){
+ currentSession=session;
+ $("login-screen").classList.add("hidden");$("app").classList.remove("hidden");
+ $("user-email").textContent=session.user.email||"";
+ await loadCurrentProfile(session.user);
+ if(currentUserProfile?.deve_trocar_senha){forcePasswordChange();return}
+ await refreshAll();
+}
 async function refreshAll(){
   if(!currentSession)return;
   await loadCurrentProfile(currentSession.user);
@@ -278,11 +285,16 @@ function renderSaasAdmin(){
    <td class="${e.ativa?"license-ok":"license-blocked"}">${e.ativa?"Ativa":"Bloqueada"}</td>
    <td>${e.licencas_max}</td><td>${e.licencas_usadas}</td>
    <td>${e.licenca_validade?new Date(e.licenca_validade+"T12:00:00").toLocaleDateString("pt-BR"):"Sem limite"}</td>
-   <td><button class="action-btn" onclick="empresaSaasForm(empresasSaas.find(x=>x.id==='${e.id}'))">Editar</button></td>
+   <td><div class="action-group">
+     <button class="action-btn" onclick="manageLicenses('${e.id}')">Licenças</button>
+     <button class="action-btn" onclick="empresaSaasForm(empresasSaas.find(x=>x.id==='${e.id}'))">Editar</button>
+     ${e.nome==="Administração Core Orça"?"":`<button class="action-btn danger" onclick="deleteCompany('${e.id}')">Excluir</button>`}
+   </div></td>
  </tr>`).join("")||'<tr><td colspan="8">Nenhuma empresa cadastrada.</td></tr>';
 }
 function empresaSaasForm(e={}){
- openModal(e.id?"Editar empresa/licença":"Cadastrar empresa",`<form id="entity-form">
+ const creating=!e.id;
+ openModal(creating?"Cadastrar empresa e Gerente":"Editar empresa/licenciamento",`<form id="entity-form">
  <div class="form-grid">
    <label>Empresa*<input id="f-nome" required value="${esc(e.nome)}"></label>
    <label>CNPJ/Documento<input id="f-doc" value="${esc(e.documento)}"></label>
@@ -291,30 +303,121 @@ function empresaSaasForm(e={}){
    <label>Quantidade de licenças*<input id="f-lic" type="number" min="1" required value="${e.licencas_max||1}"></label>
    <label>Validade da licença<input id="f-validade" type="date" value="${e.licenca_validade||""}"></label>
    <label>Status<select id="f-ativa"><option value="true" ${e.ativa!==false?"selected":""}>Ativa</option><option value="false" ${e.ativa===false?"selected":""}>Bloqueada</option></select></label>
-   <label>E-mail do Gerente inicial<input id="f-gerente" type="email" value="${esc(e.gerente_email||e.responsavel_email||"")}" placeholder="Login que administrará esta empresa"></label>
+   <label>Nome do Gerente${creating?"*":""}<input id="f-gerente-nome" ${creating?"required":""} value="${esc(e.responsavel_nome||"")}"></label>
+   <label>E-mail do Gerente${creating?"*":""}<input id="f-gerente" type="email" ${creating?"required":""} value="${esc(e.gerente_email||e.responsavel_email||"")}" placeholder="gerente@empresa.com.br"></label>
    <label class="span-2">Observações comerciais<textarea id="f-obs">${esc(e.observacoes_licenca)}</textarea></label>
  </div>
+ ${creating?'<div class="force-password-note">Ao salvar, o sistema criará o login do Gerente e gerará uma senha temporária aleatória. Essa senha será exibida uma única vez para você repassar ao Gerente. No primeiro login, ele será obrigado a definir uma nova senha.</div>':""}
  <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar empresa</button></div>
  </form>`);
  $("entity-form").onsubmit=async ev=>{
    ev.preventDefault();
    const payload={
-     p_id:e.id||null,
-     p_nome:$("f-nome").value.trim(),
-     p_documento:$("f-doc").value.trim()||null,
-     p_licencas:Number($("f-lic").value)||1,
-     p_validade:$("f-validade").value||null,
-     p_ativa:$("f-ativa").value==="true",
-     p_gerente_email:$("f-gerente").value.trim().toLowerCase()||null,
+     p_id:e.id||null,p_nome:$("f-nome").value.trim(),p_documento:$("f-doc").value.trim()||null,
+     p_licencas:Number($("f-lic").value)||1,p_validade:$("f-validade").value||null,
+     p_ativa:$("f-ativa").value==="true",p_gerente_email:null,
      p_responsavel_nome:$("f-resp-nome").value.trim()||null,
      p_responsavel_email:$("f-resp-email").value.trim().toLowerCase()||null,
      p_observacoes:$("f-obs").value.trim()||null
    };
-   const {error}=await sb.rpc("admin_upsert_empresa_v10",payload);
+   const {data:empresaId,error}=await sb.rpc("admin_upsert_empresa_v11",payload);
    if(error)return toast("Erro: "+error.message);
-   closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Empresa e licenças salvas.");
+
+   if(creating){
+     const gerenteEmail=$("f-gerente").value.trim().toLowerCase();
+     const gerenteNome=$("f-gerente-nome").value.trim();
+     const {data:created,error:fnError}=await sb.functions.invoke("core-orca-admin-users",{
+       body:{action:"create-manager",empresa_id:empresaId,email:gerenteEmail,nome:gerenteNome}
+     });
+     if(fnError||created?.error){
+       return toast("Empresa criada, mas houve erro ao criar o Gerente: "+(created?.error||fnError?.message||"erro desconhecido"));
+     }
+     closeModal();
+     await loadSaasAdmin();renderSaasAdmin();
+     showTemporaryPassword(gerenteEmail,created.temporary_password);
+     return;
+   }
+   closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Empresa atualizada.");
  };
 }
+
+function showTemporaryPassword(email,password){
+ openModal("Gerente criado",`<p>O login do Gerente foi criado.</p>
+ <div class="temp-password-box">
+   <div><b>Login:</b> ${esc(email)}</div>
+   <div style="margin-top:10px"><b>Senha temporária:</b></div>
+   <div class="temp-password">${esc(password)}</div>
+ </div>
+ <p class="muted">Copie essa senha agora. Ela não será armazenada em texto aberto nem exibida novamente. No primeiro login o Gerente deverá criar uma nova senha.</p>
+ <div class="modal-actions"><button class="btn primary" onclick="closeModal()">Concluir</button></div>`);
+}
+
+function forcePasswordChange(){
+ openModal("Crie sua nova senha",`<div class="force-password-note"><b>Primeiro acesso.</b> Para continuar, substitua a senha temporária por uma senha pessoal.</div>
+ <form id="force-password-form">
+   <div class="form-grid">
+     <label>Nova senha<input id="new-password" type="password" minlength="8" required autocomplete="new-password"></label>
+     <label>Confirmar nova senha<input id="new-password-2" type="password" minlength="8" required autocomplete="new-password"></label>
+   </div>
+   <div id="password-change-error" class="error"></div>
+   <div class="modal-actions"><button class="btn primary">Alterar senha e entrar</button></div>
+ </form>`);
+ $("modal-close").classList.add("hidden");
+ $("force-password-form").onsubmit=async ev=>{
+   ev.preventDefault();
+   const p1=$("new-password").value,p2=$("new-password-2").value;
+   if(p1!==p2){$("password-change-error").textContent="As senhas não coincidem.";return}
+   if(p1.length<8){$("password-change-error").textContent="Use pelo menos 8 caracteres.";return}
+   const {error}=await sb.auth.updateUser({password:p1});
+   if(error){$("password-change-error").textContent=error.message;return}
+   const r=await sb.rpc("concluir_primeira_troca_senha");
+   if(r.error){$("password-change-error").textContent=r.error.message;return}
+   $("modal-close").classList.remove("hidden");closeModal();
+   await refreshAll();
+   toast("Senha alterada com sucesso.");
+ };
+}
+
+async function manageLicenses(empresaId){
+ const empresa=empresasSaas.find(e=>e.id===empresaId);
+ const {data,error}=await sb.rpc("admin_list_licencas_v11",{p_empresa_id:empresaId});
+ if(error)return toast(error.message);
+ const rows=data||[];
+ openModal("Licenças — "+empresa.nome,`<div class="panel-head"><div><p class="muted">Gerencie individualmente cada licença desta empresa.</p></div><button id="add-license-btn" class="btn primary">+ Licença</button></div>
+ <div class="license-list">${rows.map(l=>`<div class="license-row">
+   <b>Licença ${l.numero}</b>
+   <span class="${l.status==="ativa"?"license-active":"license-blocked"}">${statusLabel(l.status)}</span>
+   <span>${esc(l.usuario_email||"Não atribuída")}</span>
+   <div class="action-group">
+     ${l.status==="ativa"?`<button class="action-btn warning" onclick="licenseAction('${l.id}','block','${empresaId}')">Bloquear</button>`:`<button class="action-btn" onclick="licenseAction('${l.id}','activate','${empresaId}')">Ativar</button>`}
+     <button class="action-btn danger" onclick="licenseAction('${l.id}','delete','${empresaId}')">Excluir</button>
+   </div>
+ </div>`).join("")||"<p>Nenhuma licença cadastrada.</p>"}</div>`);
+ $("add-license-btn").onclick=async()=>{
+   const {error}=await sb.rpc("admin_add_license_v11",{p_empresa_id:empresaId});
+   if(error)return toast(error.message);
+   closeModal();await loadSaasAdmin();renderSaasAdmin();manageLicenses(empresaId);
+ };
+}
+
+async function licenseAction(id,action,empresaId){
+ if(action==="delete"&&!confirm("Excluir esta licença? Se estiver vinculada a um usuário, o acesso desse usuário será desativado."))return;
+ const {error}=await sb.rpc("admin_license_action_v11",{p_license_id:id,p_action:action});
+ if(error)return toast(error.message);
+ closeModal();await loadSaasAdmin();renderSaasAdmin();manageLicenses(empresaId);
+}
+
+async function deleteCompany(id){
+ const e=empresasSaas.find(x=>x.id===id);
+ if(!e)return;
+ if(!confirm(`EXCLUIR a empresa "${e.nome}"? Todos os clientes, materiais, OS, financeiro e demais dados dessa empresa serão apagados. Esta ação não pode ser desfeita.`))return;
+ const typed=prompt(`Para confirmar, digite exatamente o nome da empresa:\n${e.nome}`);
+ if(typed!==e.nome)return toast("Exclusão cancelada.");
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"delete-company",empresa_id:id}});
+ if(error||data?.error)return toast("Erro ao excluir: "+(data?.error||error?.message||"erro desconhecido"));
+ await loadSaasAdmin();renderSaasAdmin();toast("Empresa excluída.");
+}
+
 function renderFornecedores(){
  const q=$("fornecedor-search").value.toLowerCase(), rows=fornecedores.filter(f=>[f.nome,f.documento,f.telefone,f.email,f.cidade].some(v=>String(v||"").toLowerCase().includes(q)));
  $("fornecedores-table").innerHTML=rows.map(f=>`<tr><td><b>${esc(f.nome)}</b><br><span class="muted">${esc(f.email||"")}</span></td><td>${esc(f.documento||"-")}</td><td>${esc(f.telefone||"-")}</td><td>${esc([f.cidade,f.uf].filter(Boolean).join("/")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editFornecedor('${f.id}')">Editar</button><button class="action-btn" onclick="deleteFornecedor('${f.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="5">Nenhum fornecedor.</td></tr>';

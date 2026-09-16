@@ -34,6 +34,9 @@
         <button class="nav-item" data-page="agenda">Agenda</button>
         <button class="nav-item" data-page="financeiro">Financeiro</button>
         <button class="nav-item" data-page="tecnicos">Técnicos</button>
+        <button class="nav-item" data-page="fornecedores">Fornecedores</button>
+        <button class="nav-item" data-page="compras">Compras</button>
+        <button class="nav-item admin-only" data-page="usuarios">Usuários</button>
         <button class="nav-item" data-page="configuracoes">Configurações</button>
       </nav>
       <div class="sidebar-footer">
@@ -129,13 +132,32 @@
         <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Telefone</th><th>E-mail</th><th>Status</th><th></th></tr></thead><tbody id="tecnicos-table"></tbody></table></div>
       </section>
 
-      <section id="page-configuracoes" class="page hidden">
+      <section id="page-fornecedores" class="page hidden">
+        <div class="toolbar"><input id="fornecedor-search" placeholder="Pesquisar fornecedor..."><button id="novo-fornecedor" class="btn primary">+ Fornecedor</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Fornecedor</th><th>CNPJ/CPF</th><th>Contato</th><th>Cidade/UF</th><th></th></tr></thead><tbody id="fornecedores-table"></tbody></table></div>
+      </section>
+
+      <section id="page-compras" class="page hidden">
+        <div class="toolbar"><input id="compra-search" placeholder="Pesquisar compra ou fornecedor..."><button id="nova-compra" class="btn primary">+ Compra</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Nº</th><th>Fornecedor</th><th>Data</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody id="compras-table"></tbody></table></div>
+      </section>
+
+      <section id="page-usuarios" class="page hidden admin-only">
+        <div class="panel">
+          <h3>Perfis e permissões</h3>
+          <p class="muted">Associe o e-mail de login a um perfil. O usuário precisa existir no Supabase Auth para conseguir entrar.</p>
+          <div class="toolbar"><input id="usuario-search" placeholder="Pesquisar usuário..."><button id="novo-usuario" class="btn primary">+ Perfil de usuário</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th></th></tr></thead><tbody id="usuarios-table"></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="page-configuracoes" class="page hidden admin-only">
         <div class="panel config-panel">
           <h3>Dados da empresa</h3>
           <p class="muted">Esses dados serão usados nos documentos de orçamento e ordem de serviço.</p>
           <form id="empresa-form">
             <div class="form-grid">
-              <label>Nome fantasia<input id="emp-nome"></label>
+              <label>Nome fantasia<input id="emp-nome"></label><label>Logo da empresa<input id="emp-logo" type="file" accept="image/png,image/jpeg,image/webp"></label>
               <label>Razão social<input id="emp-razao"></label>
               <label>CNPJ<input id="emp-cnpj"></label>
               <label>Telefone<input id="emp-telefone"></label>

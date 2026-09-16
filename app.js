@@ -2,7 +2,7 @@ const SUPABASE_URL = "https://vihhktumvtfdcnthekic.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhrdHVtdnRmZGNudGhla2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjY5NTksImV4cCI6MjEwNTE0Mjk1OX0.F6dsoPwigniSvr6CwA8S91tr7KAH-utME0uAwr4etpo";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], empresa=null, currentPage="dashboard";
+let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], fornecedores=[], compras=[], usuarios=[], empresa=null, currentUserProfile=null, currentPage="dashboard";
 let editorItens=[];
 
 const $=id=>document.getElementById(id);
@@ -20,7 +20,7 @@ async function init(){
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
 async function showApp(session){$("login-screen").classList.add("hidden");$("app").classList.remove("hidden");$("user-email").textContent=session.user.email||"";await refreshAll()}
 async function refreshAll(){
-  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadEmpresa()]);
+  await loadCurrentProfile(session.user); await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa()]); applyPermissions();
   renderDashboard(); renderCurrent();
 }
 function renderCurrent(){
@@ -34,6 +34,9 @@ function renderCurrent(){
   if(currentPage==="financeiro")renderFinanceiro();
   if(currentPage==="tecnicos")renderTecnicos();
   if(currentPage==="configuracoes")renderEmpresa();
+  if(currentPage==="fornecedores")renderFornecedores();
+  if(currentPage==="compras")renderCompras();
+  if(currentPage==="usuarios")renderUsuarios();
 }
 async function loadClientes(){const {data,error}=await sb.from("clientes").select("*").eq("ativo",true).order("nome");if(error)return toast("Clientes: "+error.message);clientes=data||[]}
 async function loadMateriais(){const {data,error}=await sb.from("materiais").select("*").eq("ativo",true).order("nome");if(error)return toast("Materiais: "+error.message);materiais=data||[]}
@@ -45,6 +48,19 @@ async function loadAgenda(){const {data,error}=await sb.from("agenda").select("*
 async function loadFinanceiro(){const {data,error}=await sb.from("financeiro").select("*,clientes(nome),ordens_servico(numero)").order("vencimento",{ascending:true});if(error){financeiro=[];return}financeiro=data||[]}
 async function loadTecnicos(){const {data,error}=await sb.from("tecnicos").select("*").order("nome");if(error){tecnicos=[];return}tecnicos=data||[]}
 async function loadEmpresa(){const {data,error}=await sb.from("empresa_config").select("*").limit(1).maybeSingle();if(error){empresa=null;return}empresa=data||null}
+
+async function loadCurrentProfile(user){const {data}=await sb.from("usuarios_perfis").select("*").eq("email",user.email).eq("ativo",true).maybeSingle();currentUserProfile=data||{email:user.email,nome:user.email,perfil:"admin",ativo:true}}
+async function loadFornecedores(){const {data,error}=await sb.from("fornecedores").select("*").eq("ativo",true).order("nome");if(error){fornecedores=[];return}fornecedores=data||[]}
+async function loadCompras(){const {data,error}=await sb.from("compras").select("*,fornecedores(nome)").order("created_at",{ascending:false});if(error){compras=[];return}compras=data||[]}
+async function loadUsuarios(){const {data,error}=await sb.from("usuarios_perfis").select("*").order("nome");if(error){usuarios=[];return}usuarios=data||[]}
+function applyPermissions(){
+ const role=currentUserProfile?.perfil||"tecnico";
+ document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("restricted",role!=="admin"));
+ if(role==="tecnico"){
+   document.querySelectorAll('[data-page="financeiro"],[data-page="configuracoes"],[data-page="usuarios"],[data-page="compras"],[data-page="fornecedores"]').forEach(el=>el.classList.add("hidden"));
+ }
+}
+
 
 
 
@@ -64,7 +80,7 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 function renderClientes(){
@@ -85,11 +101,11 @@ function renderEstoque(){
 }
 function renderOrcamentos(){
  const q=$("orcamento-search").value.toLowerCase();const rows=orcamentos.filter(o=>[o.numero,o.clientes?.nome,o.status].some(v=>String(v||"").toLowerCase().includes(q)));
- $("orcamentos-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOrcamento('${o.id}')">Abrir</button><button class="action-btn" onclick="convertOrcamento('${o.id}')">Gerar OS</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum orçamento encontrado.</td></tr>`;
+ $("orcamentos-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOrcamento('${o.id}')">Abrir</button><button class="action-btn" onclick="editOrcamento('${o.id}')">Editar</button><button class="action-btn" onclick="duplicateOrcamento('${o.id}')">Duplicar</button><button class="action-btn" onclick="convertOrcamento('${o.id}')">Gerar OS</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum orçamento encontrado.</td></tr>`;
 }
 function renderOS(){
  const q=$("os-search").value.toLowerCase(), sf=$("os-status-filter").value;const rows=ordens.filter(o=>(!sf||o.status===sf)&&[o.numero,o.clientes?.nome,o.responsavel,o.status].some(v=>String(v||"").toLowerCase().includes(q)));
- $("os-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_abertura+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${esc(o.responsavel||"-")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOS('${o.id}')">Abrir</button>${o.status!=="concluida"&&o.status!=="cancelada"?`<button class="action-btn" onclick="concluirOS('${o.id}')">Concluir</button>`:""}</div></td></tr>`).join("")||`<tr><td colspan="7">Nenhuma OS encontrada.</td></tr>`;
+ $("os-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_abertura+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${esc(o.responsavel||"-")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOS('${o.id}')">Abrir</button><button class="action-btn" onclick="editOS('${o.id}')">Editar</button>${o.status!=="concluida"&&o.status!=="cancelada"?`<button class="action-btn" onclick="concluirOS('${o.id}')">Concluir</button>`:""}</div></td></tr>`).join("")||`<tr><td colspan="7">Nenhuma OS encontrada.</td></tr>`;
 }
 
 
@@ -120,6 +136,60 @@ async function markPaid(id){const {error}=await sb.from("financeiro").update({st
 async function deleteFinance(id){if(!confirm("Excluir lançamento?"))return;const {error}=await sb.from("financeiro").delete().eq("id",id);if(error)return toast(error.message);await loadFinanceiro();renderFinanceiro()}
 
 
+
+function renderFornecedores(){
+ const q=$("fornecedor-search").value.toLowerCase(), rows=fornecedores.filter(f=>[f.nome,f.documento,f.telefone,f.email,f.cidade].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("fornecedores-table").innerHTML=rows.map(f=>`<tr><td><b>${esc(f.nome)}</b><br><span class="muted">${esc(f.email||"")}</span></td><td>${esc(f.documento||"-")}</td><td>${esc(f.telefone||"-")}</td><td>${esc([f.cidade,f.uf].filter(Boolean).join("/")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editFornecedor('${f.id}')">Editar</button><button class="action-btn" onclick="deleteFornecedor('${f.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="5">Nenhum fornecedor.</td></tr>';
+}
+function fornecedorForm(f={}){
+ openModal(f.id?"Editar fornecedor":"Novo fornecedor",`<form id="entity-form"><div class="form-grid"><label>Nome / Razão social*<input id="f-nome" required value="${esc(f.nome)}"></label><label>CNPJ / CPF<input id="f-doc" value="${esc(f.documento)}"></label><label>Telefone<input id="f-tel" value="${esc(f.telefone)}"></label><label>E-mail<input id="f-email" type="email" value="${esc(f.email)}"></label><label>CEP<input id="f-cep" value="${esc(f.cep)}"></label><label>Endereço<input id="f-end" value="${esc(f.endereco)}"></label><label>Cidade<input id="f-cidade" value="${esc(f.cidade)}"></label><label>UF<input id="f-uf" maxlength="2" value="${esc(f.uf)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(f.observacoes)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),documento:$("f-doc").value.trim(),telefone:$("f-tel").value.trim(),email:$("f-email").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-end").value.trim(),cidade:$("f-cidade").value.trim(),uf:$("f-uf").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim()};const r=f.id?await sb.from("fornecedores").update(obj).eq("id",f.id):await sb.from("fornecedores").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadFornecedores();renderFornecedores();toast("Fornecedor salvo")};
+}
+function editFornecedor(id){const f=fornecedores.find(x=>x.id===id);if(f)fornecedorForm(f)}
+async function deleteFornecedor(id){if(!confirm("Excluir fornecedor?"))return;const {error}=await sb.from("fornecedores").update({ativo:false}).eq("id",id);if(error)return toast(error.message);await loadFornecedores();renderFornecedores()}
+
+function renderCompras(){
+ const q=$("compra-search").value.toLowerCase(), rows=compras.filter(c=>[c.numero,c.status,c.fornecedores?.nome].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("compras-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.numero)}</b></td><td>${esc(c.fornecedores?.nome||"-")}</td><td>${new Date(c.data_compra+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(c.status)}">${statusLabel(c.status)}</span></td><td>${money(c.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewCompra('${c.id}')">Abrir</button>${c.status==="rascunho"?`<button class="action-btn" onclick="confirmCompra('${c.id}')">Confirmar entrada</button>`:""}</div></td></tr>`).join("")||'<tr><td colspan="6">Nenhuma compra.</td></tr>';
+}
+function compraForm(){
+ editorItens=[];openModal("Nova compra",`<form id="entity-form"><div class="form-grid"><label>Fornecedor*<select id="f-fornecedor" required><option value="">Selecione...</option>${fornecedores.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join("")}</select></label><label>Data<input id="f-data" type="date" value="${today()}"></label><label>Vencimento<input id="f-vencimento" type="date"></label><label>Documento / NF<input id="f-documento"></label><label class="span-2">Observações<textarea id="f-obs"></textarea></label></div><div class="item-builder"><b>Materiais da compra</b><div class="form-grid"><label>Pesquisar material<input id="buy-search" autocomplete="off" placeholder="Código ou nome"><div id="buy-suggestions" class="suggestions hidden"></div></label><label>Quantidade<input id="buy-qtd" type="number" min="0.001" step="0.001" value="1"></label><label>Custo unitário<input id="buy-cost" type="number" min="0" step="0.01"></label></div><input id="buy-id" type="hidden"><button type="button" id="buy-add" class="btn secondary">Adicionar</button><div class="items-table"><table><thead><tr><th>Material</th><th>Qtd.</th><th>Custo</th><th>Total</th><th></th></tr></thead><tbody id="buy-items"></tbody></table></div><div class="totals">Total: <span id="buy-total">R$ 0,00</span></div></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar compra</button></div></form>`);
+ const s=$("buy-search"),box=$("buy-suggestions");s.oninput=()=>{const q=s.value.toLowerCase();$("buy-id").value="";if(!q)return box.classList.add("hidden");const found=materiais.filter(m=>[m.codigo,m.nome].some(v=>String(v||"").toLowerCase().includes(q))).slice(0,20);box.innerHTML=found.map(m=>`<div class="suggestion" data-id="${m.id}">${esc(m.codigo||"")} ${esc(m.nome)} — custo ${money(m.custo)}</div>`).join("");box.classList.remove("hidden");box.querySelectorAll("[data-id]").forEach(el=>el.onclick=()=>{const m=materiais.find(x=>x.id===el.dataset.id);$("buy-id").value=m.id;s.value=`${m.codigo?m.codigo+" - ":""}${m.nome}`;$("buy-cost").value=Number(m.custo||0);box.classList.add("hidden")})};
+ function draw(){ $("buy-items").innerHTML=editorItens.map((i,n)=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td><td><button type="button" class="action-btn" data-rm="${n}">Remover</button></td></tr>`).join("")||'<tr><td colspan="5">Sem itens.</td></tr>';$("buy-total").textContent=money(editorItens.reduce((a,i)=>a+i.quantidade*i.valor_unitario,0));document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{editorItens.splice(Number(b.dataset.rm),1);draw()})}
+ $("buy-add").onclick=()=>{const id=$("buy-id").value,q=Number($("buy-qtd").value),c=Number($("buy-cost").value);const m=materiais.find(x=>x.id===id);if(!m||q<=0)return toast("Selecione um material.");editorItens.push({referencia_id:id,descricao:m.nome,quantidade:q,valor_unitario:c});s.value="";$("buy-id").value="";$("buy-qtd").value=1;$("buy-cost").value="";draw()};draw();
+ $("entity-form").onsubmit=async e=>{e.preventDefault();if(!editorItens.length)return toast("Adicione materiais.");const total=editorItens.reduce((a,i)=>a+i.quantidade*i.valor_unitario,0);const {data,error}=await sb.from("compras").insert({fornecedor_id:$("f-fornecedor").value,data_compra:$("f-data").value,vencimento:$("f-vencimento").value||null,documento:$("f-documento").value.trim(),observacoes:$("f-obs").value.trim(),total,status:"rascunho"}).select().single();if(error)return toast(error.message);const r=await sb.from("compra_itens").insert(editorItens.map(i=>({compra_id:data.id,material_id:i.referencia_id,descricao:i.descricao,quantidade:i.quantidade,custo_unitario:i.valor_unitario})));if(r.error)return toast(r.error.message);closeModal();await loadCompras();renderCompras();toast("Compra criada")};
+}
+async function viewCompra(id){const c=compras.find(x=>x.id===id);const {data,error}=await sb.from("compra_itens").select("*").eq("compra_id",id);if(error)return toast(error.message);openModal("Compra "+c.numero,`<p><b>Fornecedor:</b> ${esc(c.fornecedores?.nome||"-")}</p><p><b>Status:</b> ${statusLabel(c.status)}</p><div class="table-wrap"><table><thead><tr><th>Material</th><th>Qtd.</th><th>Custo</th><th>Total</th></tr></thead><tbody>${data.map(i=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.custo_unitario)}</td><td>${money(i.quantidade*i.custo_unitario)}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button></div>`)}
+async function confirmCompra(id){if(!confirm("Confirmar compra? Isso dará entrada no estoque e criará a conta a pagar."))return;const {data,error}=await sb.rpc("confirmar_compra",{p_compra_id:id});if(error)return toast(error.message);await Promise.all([loadCompras(),loadMateriais(),loadFinanceiro()]);renderCompras();renderDashboard();toast(data)}
+
+function renderUsuarios(){
+ const q=$("usuario-search").value.toLowerCase(), rows=usuarios.filter(u=>[u.nome,u.email,u.perfil].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td><span class="badge role-${esc(u.perfil)}">${statusLabel(u.perfil)}</span></td><td>${u.ativo?"Ativo":"Inativo"}</td><td><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button></td></tr>`).join("")||'<tr><td colspan="5">Nenhum perfil.</td></tr>';
+}
+function usuarioForm(u={}){
+ openModal(u.id?"Editar perfil":"Novo perfil de usuário",`<form id="entity-form"><div class="form-grid"><label>Nome<input id="f-nome" value="${esc(u.nome)}"></label><label>E-mail de login*<input id="f-email" type="email" required value="${esc(u.email)}"></label><label>Perfil<select id="f-perfil"><option value="admin" ${u.perfil==="admin"?"selected":""}>Administrador</option><option value="escritorio" ${u.perfil==="escritorio"?"selected":""}>Escritório</option><option value="tecnico" ${u.perfil==="tecnico"?"selected":""}>Técnico</option></select></label><label>Ativo<select id="f-ativo"><option value="true">Sim</option><option value="false" ${u.ativo===false?"selected":""}>Não</option></select></label></div><p class="permission-note">Este cadastro define permissões do Core-Orca; a conta de autenticação deve existir no Supabase Auth.</p><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),email:$("f-email").value.trim().toLowerCase(),perfil:$("f-perfil").value,ativo:$("f-ativo").value==="true"};const r=u.id?await sb.from("usuarios_perfis").update(obj).eq("id",u.id):await sb.from("usuarios_perfis").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadUsuarios();renderUsuarios();toast("Perfil salvo")};
+}
+function editUsuario(id){const u=usuarios.find(x=>x.id===id);if(u)usuarioForm(u)}
+
+async function duplicateOrcamento(id){
+ const o=orcamentos.find(x=>x.id===id);const {data:itens,error}=await sb.from("orcamento_itens").select("*").eq("orcamento_id",id).order("ordem");if(error)return toast(error.message);
+ const {data:n,error:e}=await sb.from("orcamentos").insert({cliente_id:o.cliente_id,data_orcamento:today(),validade_dias:o.validade_dias,status:"rascunho",observacoes:o.observacoes,subtotal:o.subtotal,desconto:o.desconto,total:o.total}).select().single();if(e)return toast(e.message);
+ const r=await sb.from("orcamento_itens").insert(itens.map(i=>({orcamento_id:n.id,tipo:i.tipo,material_id:i.material_id,servico_id:i.servico_id,descricao:i.descricao,quantidade:i.quantidade,valor_unitario:i.valor_unitario,ordem:i.ordem})));if(r.error)return toast(r.error.message);await loadOrcamentos();renderOrcamentos();toast("Orçamento duplicado: "+n.numero);
+}
+async function editOrcamento(id){
+ const o=orcamentos.find(x=>x.id===id);const {data:itens,error}=await sb.from("orcamento_itens").select("*").eq("orcamento_id",id).order("ordem");if(error)return toast(error.message);
+ editorItens=itens.map(i=>({tipo:i.tipo,referencia_id:i.material_id||i.servico_id,descricao:i.descricao,quantidade:Number(i.quantidade),valor_unitario:Number(i.valor_unitario)}));
+ openModal("Editar "+o.numero,`<form id="entity-form"><div class="form-grid"><label>Status<select id="f-status"><option value="rascunho">Rascunho</option><option value="enviado">Enviado</option><option value="aprovado">Aprovado</option><option value="reprovado">Reprovado</option><option value="cancelado">Cancelado</option></select></label><label>Validade<input id="f-validade" type="number" value="${o.validade_dias}"></label><label>Desconto<input id="f-desconto" type="number" step="0.01" value="${o.desconto}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(o.observacoes||"")}</textarea></label></div>${itemEditorHTML()}<div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar alterações</button></div></form>`);
+ $("f-status").value=o.status;setupItemEditor();$("f-desconto").oninput=calcEditorTotal;
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const subtotal=editorItens.reduce((s,i)=>s+i.quantidade*i.valor_unitario,0),desconto=Number($("f-desconto").value)||0;const h=await sb.from("orcamentos").update({status:$("f-status").value,validade_dias:Number($("f-validade").value)||0,observacoes:$("f-obs").value.trim(),subtotal,desconto,total:Math.max(0,subtotal-desconto)}).eq("id",id);if(h.error)return toast(h.error.message);await sb.from("orcamento_itens").delete().eq("orcamento_id",id);const r=await sb.from("orcamento_itens").insert(editorItens.map((i,n)=>({orcamento_id:id,tipo:i.tipo,material_id:i.tipo==="material"?i.referencia_id:null,servico_id:i.tipo==="servico"?i.referencia_id:null,descricao:i.descricao,quantidade:i.quantidade,valor_unitario:i.valor_unitario,ordem:n})));if(r.error)return toast(r.error.message);closeModal();await loadOrcamentos();renderOrcamentos();toast("Orçamento atualizado")};
+}
+async function editOS(id){
+ const o=ordens.find(x=>x.id===id);openModal("Editar "+o.numero,`<form id="entity-form"><div class="form-grid"><label>Status<select id="f-status"><option value="aberta">Aberta</option><option value="em_andamento">Em andamento</option><option value="aguardando_material">Aguardando material</option><option value="cancelada">Cancelada</option></select></label><label>Responsável<select id="f-responsavel"><option value="">Selecione...</option>${tecnicos.filter(t=>t.ativo).map(t=>`<option value="${esc(t.nome)}">${esc(t.nome)}</option>`).join("")}</select></label><label class="span-2">Local<input id="f-local" value="${esc(o.local_servico||"")}"></label><label class="span-2">Solicitação<textarea id="f-problema">${esc(o.descricao_problema||"")}</textarea></label><label>Previsão<input id="f-previsao" type="date" value="${o.previsao_conclusao||""}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(o.observacoes||"")}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("f-status").value=o.status==="concluida"?"em_andamento":o.status;$("f-responsavel").value=o.responsavel||"";
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={status:$("f-status").value,responsavel:$("f-responsavel").value,local_servico:$("f-local").value.trim(),descricao_problema:$("f-problema").value.trim(),previsao_conclusao:$("f-previsao").value||null,observacoes:$("f-obs").value.trim()};const {error}=await sb.from("ordens_servico").update(obj).eq("id",id);if(error)return toast(error.message);await addOSTimeline(id,"edicao","Dados da Ordem de Serviço atualizados.");closeModal();await loadOrdens();renderOS();toast("OS atualizada")};
+}
+
 function renderTecnicos(){
  const q=$("tecnico-search").value.toLowerCase(), rows=tecnicos.filter(t=>[t.nome,t.funcao,t.telefone,t.email].some(v=>String(v||"").toLowerCase().includes(q)));
  $("tecnicos-table").innerHTML=rows.map(t=>`<tr><td><b>${esc(t.nome)}</b></td><td>${esc(t.funcao||"-")}</td><td>${esc(t.telefone||"-")}</td><td>${esc(t.email||"-")}</td><td>${t.ativo?"Ativo":"Inativo"}</td><td><div class="actions"><button class="action-btn" onclick="editTecnico('${t.id}')">Editar</button><button class="action-btn" onclick="toggleTecnico('${t.id}',${!t.ativo})">${t.ativo?"Inativar":"Ativar"}</button></div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum técnico.</td></tr>';
@@ -137,6 +207,7 @@ function renderEmpresa(){
 }
 async function saveEmpresa(e){
  e.preventDefault();const obj={nome_fantasia:$("emp-nome").value.trim(),razao_social:$("emp-razao").value.trim(),cnpj:$("emp-cnpj").value.trim(),telefone:$("emp-telefone").value.trim(),email:$("emp-email").value.trim(),cep:$("emp-cep").value.trim(),endereco:$("emp-endereco").value.trim(),cidade:$("emp-cidade").value.trim(),uf:$("emp-uf").value.trim().toUpperCase(),rodape_documentos:$("emp-rodape").value.trim()};
+ const logo=$("emp-logo")?.files?.[0];if(logo){const ext=(logo.name.split(".").pop()||"png").toLowerCase(),path=`empresa/logo.${ext}`;const up=await sb.storage.from("empresa-assets").upload(path,logo,{upsert:true,contentType:logo.type});if(up.error)return toast("Logo: "+up.error.message);const {data:u}=sb.storage.from("empresa-assets").getPublicUrl(path);obj.logo_url=u.publicUrl}
  let r;if(empresa?.id)r=await sb.from("empresa_config").update(obj).eq("id",empresa.id);else r=await sb.from("empresa_config").insert(obj);
  if(r.error)return toast(r.error.message);await loadEmpresa();renderEmpresa();toast("Configurações salvas");
 }
@@ -145,7 +216,7 @@ async function addOSTimeline(osId,tipo,descricao){
 }
 async function loadOSTimeline(osId){const {data}=await sb.from("os_historico").select("*").eq("ordem_servico_id",osId).order("created_at",{ascending:false});return data||[]}
 function companyHeader(){
- const e=empresa||{};return `<h1>${esc(e.nome_fantasia||"Core-Orca")}</h1>${e.razao_social?`<p>${esc(e.razao_social)}</p>`:""}${e.cnpj?`<p>CNPJ: ${esc(e.cnpj)}</p>`:""}<p>${esc([e.telefone,e.email].filter(Boolean).join(" | "))}</p><p>${esc([e.endereco,e.cidade,e.uf].filter(Boolean).join(" - "))}</p>`;
+ const e=empresa||{};return `${e.logo_url?`<img src="${esc(e.logo_url)}" style="max-width:180px;max-height:70px;object-fit:contain">`:""}<h1>${esc(e.nome_fantasia||"Core-Orca")}</h1>${e.razao_social?`<p>${esc(e.razao_social)}</p>`:""}${e.cnpj?`<p>CNPJ: ${esc(e.cnpj)}</p>`:""}<p>${esc([e.telefone,e.email].filter(Boolean).join(" | "))}</p><p>${esc([e.endereco,e.cidade,e.uf].filter(Boolean).join(" - "))}</p>`;
 }
 
 async function uploadOSPhoto(osId,file,tipo){
@@ -313,9 +384,9 @@ $("logout-btn").onclick=async()=>{await sb.auth.signOut();showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;
-$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();
+$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
-$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
+$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
 init();

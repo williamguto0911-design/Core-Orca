@@ -21,3 +21,8 @@
 .timeline-item:before{content:"";position:absolute;width:10px;height:10px;border-radius:50%;background:#2563eb;left:-24px;top:5px}
 .timeline-item small{color:#6b7280}.profit-box{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.profit-box div{background:#f9fafb;padding:10px;border-radius:8px}
 @media(max-width:850px){.dashboard-grid{grid-template-columns:1fr}.mini-stats{grid-template-columns:1fr 1fr}.profit-box{grid-template-columns:1fr}}
+
+.role-admin{background:#ede9fe;color:#5b21b6}.role-escritorio{background:#dbeafe;color:#1e40af}.role-tecnico{background:#d1fae5;color:#065f46}
+.logo-preview{max-width:180px;max-height:80px;object-fit:contain;margin:8px 0}.report-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.purchase-items{margin-top:12px}.permission-note{font-size:12px;color:#6b7280;margin-top:8px}
+@media(max-width:850px){.admin-only.restricted{display:none!important}}

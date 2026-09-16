@@ -1,38 +1,40 @@
-# Core-Orca V4
+# Core-Orca V5
 
 ## Novidades
-- Dashboard com resumo financeiro e OS recentes.
-- Técnicos: cadastro, função, contato e status.
-- Responsável da nova OS pode ser escolhido entre técnicos ativos.
-- Configurações da empresa para uso nos PDFs.
-- Financeiro com Receitas e Despesas.
-- Formas de pagamento.
-- Resultado financeiro realizado no dashboard.
-- Filtro de OS por status.
-- Histórico/timeline dentro da OS.
-- Indicador de custo de materiais e margem bruta estimada por OS.
-- PDFs passam a usar os dados cadastrados da empresa.
-- Mantém todas as funções da V3: fotos, assinatura, agenda, PDF e estoque automático.
+- Edição de orçamento existente.
+- Duplicação de orçamento.
+- Edição dos principais dados/status da OS.
+- Cadastro de fornecedores.
+- Compras com itens de material.
+- Confirmação da compra gera entrada automática no estoque.
+- Confirmação da compra gera conta a pagar no Financeiro.
+- Cadastro de perfis: Administrador, Escritório e Técnico.
+- Restrições de menus para Técnico.
+- Logo da empresa nos documentos.
+- Mantém fotos, assinatura, agenda, financeiro, histórico, estoque e demais funções anteriores.
 
 ## Instalação
-1. Não apague nada da V3.
-2. Supabase > SQL Editor: execute `supabase-v4.sql`.
-3. Se o SQL terminar sem erro, substitua no GitHub:
+1. Não apague a V4 nem seus dados.
+2. Execute `supabase-v5.sql` no SQL Editor do Supabase.
+3. Se não houver erro, substitua no GitHub:
    - index.html
    - style.css
    - app.js
-4. Commit na branch main.
-5. Aguarde o GitHub Pages e pressione Ctrl+F5.
+4. Commit na main e Ctrl+F5.
 
-## Primeiro uso
-Depois da atualização:
-1. Abra Configurações e cadastre os dados da empresa.
-2. Abra Técnicos e cadastre a equipe.
-3. Teste uma nova OS.
-4. Teste um lançamento de despesa e um de receita.
-5. Abra uma OS e confira Histórico e Margem.
+## Perfis
+A V5 introduz os perfis sem endurecer imediatamente todas as políticas RLS do banco, para evitar bloquear os logins existentes.
+O primeiro login sem perfil cadastrado continua sendo tratado como administrador pela aplicação.
+Depois, em Usuários, associe os e-mails aos perfis desejados.
 
-## Observação
-A margem exibida na OS é uma estimativa simples:
-Valor total da OS - custo cadastrado dos materiais.
-Ela ainda não desconta mão de obra, impostos, deslocamento ou outras despesas indiretas.
+Importante: criar um perfil no Core-Orca não cria a senha/login no Supabase Auth. A conta de autenticação ainda deve existir no Supabase.
+
+## Compras
+A compra começa como Rascunho. Ao clicar em “Confirmar entrada”:
+- os materiais entram no estoque;
+- o custo cadastrado do material é atualizado para o custo da compra;
+- uma despesa pendente é criada no Financeiro;
+- a mesma compra não pode lançar estoque duas vezes.
+
+## Logo
+Em Configurações, selecione PNG, JPEG ou WebP. O arquivo é salvo no bucket `empresa-assets` e usado nos documentos.

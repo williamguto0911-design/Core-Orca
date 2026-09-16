@@ -160,28 +160,54 @@ function navigate(page){
   $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
+
+/* V15.4 — busca inteligente global */
+function searchNormalize(v){
+ return String(v??"")
+  .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+  .toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+function searchFlatten(v,out=[]){
+ if(v==null)return out;
+ if(Array.isArray(v)){v.forEach(x=>searchFlatten(x,out));return out}
+ if(typeof v==="object"){Object.values(v).forEach(x=>searchFlatten(x,out));return out}
+ out.push(String(v));return out;
+}
+function smartSearch(record,query,extra=[]){
+ const q=searchNormalize(query);
+ if(!q)return true;
+ const source=[...searchFlatten(record),...extra.map(x=>String(x??""))].join(" ");
+ const text=searchNormalize(source);
+ const compact=text.replace(/\s+/g,"");
+ const words=text.split(/\s+/).filter(Boolean);
+ return q.split(/\s+/).filter(Boolean).every(term=>{
+   const compactTerm=term.replace(/\s+/g,"");
+   return words.some(w=>w.startsWith(term)||w.includes(term)) || compact.includes(compactTerm);
+ });
+}
+
 function renderClientes(){
- const q=$("cliente-search").value.toLowerCase();const rows=clientes.filter(c=>[c.nome,c.documento,c.telefone,c.celular,c.email].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("cliente-search").value;const rows=clientes.filter(c=>smartSearch(c,q));
  $("clientes-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b><br><span class="muted">${esc(c.email||"")}</span></td><td>${esc(c.tipo_pessoa)}</td><td>${esc(c.documento||"-")}</td><td>${esc(c.celular||c.telefone||"-")}</td><td>${esc([c.cidade,c.estado].filter(Boolean).join("/ ")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editCliente('${c.id}')">Editar</button><button class="action-btn" onclick="deleteCliente('${c.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum cliente encontrado.</td></tr>`;
 }
 function renderMateriais(){
- const q=$("material-search").value.toLowerCase();const rows=materiais.filter(m=>[m.codigo,m.nome,m.categoria,m.fabricante].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("material-search").value;const rows=materiais.filter(m=>smartSearch(m,q));
  $("materiais-table").innerHTML=rows.map(m=>`<tr><td>${esc(m.codigo||"-")}</td><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.fabricante||"")}</span></td><td>${esc(m.categoria||"-")}</td><td>${esc(m.unidade)}</td><td class="${Number(m.estoque_atual)<=Number(m.estoque_minimo)?"low":"ok"}">${Number(m.estoque_atual).toLocaleString("pt-BR")}</td><td>${money(m.custo)}</td><td>${money(m.preco_venda)}</td><td>${money(m.lucro_valor??(Number(m.preco_venda)-Number(m.custo)))}</td><td>${Number(m.lucro_percentual??(Number(m.custo)>0?((Number(m.preco_venda)-Number(m.custo))/Number(m.custo)*100):0)).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td><td><div class="actions"><button class="action-btn" onclick="editMaterial('${m.id}')">Editar</button><button class="action-btn" onclick="deleteMaterial('${m.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="10">Nenhum material encontrado.</td></tr>`;
 }
 function renderServicos(){
- const q=$("servico-search").value.toLowerCase();const rows=servicos.filter(s=>[s.codigo,s.nome,s.categoria,s.descricao].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("servico-search").value;const rows=servicos.filter(s=>smartSearch(s,q));
  $("servicos-table").innerHTML=rows.map(s=>`<tr><td>${esc(s.codigo||"-")}</td><td><b>${esc(s.nome)}</b><br><span class="muted">${esc(s.descricao||"")}</span></td><td>${esc(s.categoria||"-")}</td><td>${esc(s.unidade||"SV")}</td><td>${money(s.valor)}</td><td><div class="actions"><button class="action-btn" onclick="editServico('${s.id}')">Editar</button><button class="action-btn" onclick="deleteServico('${s.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum serviço encontrado.</td></tr>`;
 }
 function renderEstoque(){
- const q=$("estoque-search").value.toLowerCase();const rows=materiais.filter(m=>[m.codigo,m.nome,m.categoria].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("estoque-search").value;const rows=materiais.filter(m=>smartSearch(m,q));
  $("estoque-table").innerHTML=rows.map(m=>{const low=Number(m.estoque_atual)<=Number(m.estoque_minimo);return `<tr><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.codigo||"")}</span></td><td>${Number(m.estoque_atual).toLocaleString("pt-BR")} ${esc(m.unidade)}</td><td>${Number(m.estoque_minimo).toLocaleString("pt-BR")}</td><td class="${low?"low":"ok"}">${low?"ESTOQUE BAIXO":"OK"}</td><td>${new Date(m.updated_at).toLocaleString("pt-BR")}</td></tr>`}).join("")||`<tr><td colspan="5">Nenhum material encontrado.</td></tr>`;
 }
 function renderOrcamentos(){
- const q=$("orcamento-search").value.toLowerCase();const rows=orcamentos.filter(o=>[o.numero,o.clientes?.nome,o.status].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("orcamento-search").value;const rows=orcamentos.filter(o=>smartSearch(o,q));
  $("orcamentos-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOrcamento('${o.id}')">Abrir</button><button class="action-btn" onclick="editOrcamento('${o.id}')">Editar</button><button class="action-btn" onclick="duplicateOrcamento('${o.id}')">Duplicar</button><button class="action-btn" onclick="convertOrcamento('${o.id}')">Gerar OS</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum orçamento encontrado.</td></tr>`;
 }
 function renderOS(){
- const q=$("os-search").value.toLowerCase(), sf=$("os-status-filter").value;const rows=ordens.filter(o=>(!sf||o.status===sf)&&[o.numero,o.clientes?.nome,o.responsavel,o.status].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("os-search").value, sf=$("os-status-filter").value;const rows=ordens.filter(o=>(!sf||o.status===sf)&&smartSearch(o,q));
  $("os-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_abertura+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${esc(o.responsavel||"-")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOS('${o.id}')">Abrir</button><button class="action-btn" onclick="editOS('${o.id}')">Editar</button>${o.status!=="concluida"&&o.status!=="cancelada"?`<button class="action-btn" onclick="concluirOS('${o.id}')">Concluir</button>`:""}</div></td></tr>`).join("")||`<tr><td colspan="7">Nenhuma OS encontrada.</td></tr>`;
 }
 
@@ -265,7 +291,7 @@ function exportMateriais(){
 
 
 function renderRecibos(){
- const q=$("recibo-search").value.toLowerCase(),rows=recibos.filter(r=>[r.numero,r.status,r.clientes?.nome].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("recibo-search").value,rows=recibos.filter(r=>smartSearch(r,q));
  $("recibos-table").innerHTML=rows.map(r=>`<tr><td><b>${esc(r.numero)}</b></td><td>${esc(r.clientes?.nome||"-")}</td><td>${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(r.total)}</td><td>${money(r.valor_pago||0)}</td><td><span class="badge">${statusLabel(r.status)}</span></td><td><div class="actions"><button class="action-btn" onclick="viewRecibo('${r.id}')">Abrir</button><button class="action-btn" onclick="printRecibo('${r.id}')">PDF / Imprimir</button></div></td></tr>`).join("")||'<tr><td colspan="7">Nenhum recibo.</td></tr>';
 }
 function reciboForm(){
@@ -281,7 +307,7 @@ async function viewRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:it
 async function printRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const pay=`<h3>Pagamentos</h3><table><thead><tr><th>Parcela</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`<p><b>Recebemos de:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Emissão:</b> ${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
 
 const permissionModules=["clientes","materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes"];
-function renderCargos(){const q=$("cargo-search").value.toLowerCase(),rows=cargos.filter(c=>[c.nome,c.descricao].some(v=>String(v||"").toLowerCase().includes(q)));$("cargos-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.descricao||"-")}</td><td>${Object.keys(c.permissoes||{}).filter(k=>c.permissoes[k]?.read||c.permissoes[k]===true).map(statusLabel).join(", ")||"Sem acesso"}</td><td><button class="action-btn" onclick="cargoForm(cargos.find(x=>x.id==='${c.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="4">Nenhum cargo personalizado.</td></tr>'}
+function renderCargos(){const q=$("cargo-search").value,rows=cargos.filter(c=>smartSearch(c,q));$("cargos-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.descricao||"-")}</td><td>${Object.keys(c.permissoes||{}).filter(k=>c.permissoes[k]?.read||c.permissoes[k]===true).map(statusLabel).join(", ")||"Sem acesso"}</td><td><button class="action-btn" onclick="cargoForm(cargos.find(x=>x.id==='${c.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="4">Nenhum cargo personalizado.</td></tr>'}
 function cargoForm(c={}){
  const p=c.permissoes||{};openModal(c.id?"Editar cargo":"Novo cargo",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(c.nome)}"></label><label>Descrição<input id="f-desc" value="${esc(c.descricao)}"></label></div><div class="permission-grid">${permissionModules.map(m=>`<div class="permission-card"><b>${statusLabel(m)}</b><label><input type="checkbox" data-pm="${m}" data-pa="read" ${p[m]?.read||p[m]===true?"checked":""}> Visualizar</label><label><input type="checkbox" data-pm="${m}" data-pa="write" ${p[m]?.write?"checked":""}> Criar/editar</label><label><input type="checkbox" data-pm="${m}" data-pa="delete" ${p[m]?.delete?"checked":""}> Excluir</label></div>`).join("")}</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
  $("entity-form").onsubmit=async e=>{e.preventDefault();const perms={};document.querySelectorAll("[data-pm]").forEach(x=>{perms[x.dataset.pm]??={};perms[x.dataset.pm][x.dataset.pa]=x.checked});const obj={nome:$("f-nome").value.trim(),descricao:$("f-desc").value.trim(),permissoes:perms};const r=c.id?await sb.from("cargos").update(obj).eq("id",c.id):await sb.from("cargos").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadCargos();renderCargos();toast("Cargo salvo")};
@@ -436,23 +462,23 @@ async function deleteCompany(id){
 }
 
 function renderFornecedores(){
- const q=$("fornecedor-search").value.toLowerCase(), rows=fornecedores.filter(f=>[f.nome,f.documento,f.telefone,f.email,f.cidade].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("fornecedor-search").value, rows=fornecedores.filter(f=>smartSearch(f,q));
  $("fornecedores-table").innerHTML=rows.map(f=>`<tr><td><b>${esc(f.nome)}</b><br><span class="muted">${esc(f.email||"")}</span></td><td>${esc(f.documento||"-")}</td><td>${esc(f.telefone||"-")}</td><td>${esc([f.cidade,f.uf].filter(Boolean).join("/")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editFornecedor('${f.id}')">Editar</button><button class="action-btn" onclick="deleteFornecedor('${f.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="5">Nenhum fornecedor.</td></tr>';
 }
 function fornecedorForm(f={}){
- openModal(f.id?"Editar fornecedor":"Novo fornecedor",`<form id="entity-form"><div class="form-grid"><label>Nome / Razão social*<input id="f-nome" required value="${esc(f.nome)}"></label><label>CNPJ / CPF<input id="f-doc" value="${esc(f.documento)}"></label><label>Telefone<input id="f-tel" value="${esc(f.telefone)}"></label><label>E-mail<input id="f-email" type="email" value="${esc(f.email)}"></label><label>CEP<input id="f-cep" value="${esc(f.cep)}"></label><label>Endereço<input id="f-end" value="${esc(f.endereco)}"></label><label>Cidade<input id="f-cidade" value="${esc(f.cidade)}"></label><label>UF<input id="f-uf" maxlength="2" value="${esc(f.uf)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(f.observacoes)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ openModal(f.id?"Editar fornecedor":"Novo fornecedor",`<form id="entity-form"><div class="form-grid"><label>Nome / Razão social*<input id="f-nome" required value="${esc(f.nome)}"></label><label>CNPJ / CPF<input id="f-doc" data-mask="document" inputmode="numeric" value="${esc(f.documento)}"></label><label>Telefone<input id="f-tel" data-mask="phone" inputmode="numeric" value="${esc(f.telefone)}"></label><label>E-mail<input id="f-email" type="email" value="${esc(f.email)}"></label><label>CEP<input id="f-cep" data-mask="cep" inputmode="numeric" value="${esc(f.cep)}"></label><label>Endereço<input id="f-end" value="${esc(f.endereco)}"></label><label>Cidade<input id="f-cidade" value="${esc(f.cidade)}"></label><label>UF<input id="f-uf" maxlength="2" value="${esc(f.uf)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(f.observacoes)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
  $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),documento:$("f-doc").value.trim(),telefone:$("f-tel").value.trim(),email:$("f-email").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-end").value.trim(),cidade:$("f-cidade").value.trim(),uf:$("f-uf").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim()};const r=f.id?await sb.from("fornecedores").update(obj).eq("id",f.id):await sb.from("fornecedores").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadFornecedores();renderFornecedores();toast("Fornecedor salvo")};
 }
 function editFornecedor(id){const f=fornecedores.find(x=>x.id===id);if(f)fornecedorForm(f)}
 async function deleteFornecedor(id){if(!confirm("Excluir fornecedor?"))return;const {error}=await sb.from("fornecedores").update({ativo:false}).eq("id",id);if(error)return toast(error.message);await loadFornecedores();renderFornecedores()}
 
 function renderCompras(){
- const q=$("compra-search").value.toLowerCase(), rows=compras.filter(c=>[c.numero,c.status,c.fornecedores?.nome].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("compra-search").value, rows=compras.filter(c=>smartSearch(c,q));
  $("compras-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.numero)}</b></td><td>${esc(c.fornecedores?.nome||"-")}</td><td>${new Date(c.data_compra+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(c.status)}">${statusLabel(c.status)}</span></td><td>${money(c.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewCompra('${c.id}')">Abrir</button>${c.status==="rascunho"?`<button class="action-btn" onclick="confirmCompra('${c.id}')">Confirmar entrada</button>`:""}</div></td></tr>`).join("")||'<tr><td colspan="6">Nenhuma compra.</td></tr>';
 }
 function compraForm(){
  editorItens=[];openModal("Nova compra",`<form id="entity-form"><div class="form-grid"><label>Fornecedor*<select id="f-fornecedor" required><option value="">Selecione...</option>${fornecedores.map(f=>`<option value="${f.id}">${esc(f.nome)}</option>`).join("")}</select></label><label>Data<input id="f-data" type="date" value="${today()}"></label><label>Vencimento<input id="f-vencimento" type="date"></label><label>Documento / NF<input id="f-documento"></label><label class="span-2">Observações<textarea id="f-obs"></textarea></label></div><div class="item-builder"><b>Materiais da compra</b><div class="form-grid"><label>Pesquisar material<input id="buy-search" autocomplete="off" placeholder="Código ou nome"><div id="buy-suggestions" class="suggestions hidden"></div></label><label>Quantidade<input id="buy-qtd" type="number" min="0.001" step="0.001" value="1"></label><label>Custo unitário<input id="buy-cost" type="number" min="0" step="0.01"></label></div><input id="buy-id" type="hidden"><button type="button" id="buy-add" class="btn secondary">Adicionar</button><div class="items-table"><table><thead><tr><th>Material</th><th>Qtd.</th><th>Custo</th><th>Total</th><th></th></tr></thead><tbody id="buy-items"></tbody></table></div><div class="totals">Total: <span id="buy-total">R$ 0,00</span></div></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar compra</button></div></form>`);
- const s=$("buy-search"),box=$("buy-suggestions");s.oninput=()=>{const q=s.value.toLowerCase();$("buy-id").value="";if(!q)return box.classList.add("hidden");const found=materiais.filter(m=>[m.codigo,m.nome].some(v=>String(v||"").toLowerCase().includes(q))).slice(0,20);box.innerHTML=found.map(m=>`<div class="suggestion" data-id="${m.id}">${esc(m.codigo||"")} ${esc(m.nome)} — custo ${money(m.custo)}</div>`).join("");box.classList.remove("hidden");box.querySelectorAll("[data-id]").forEach(el=>el.onclick=()=>{const m=materiais.find(x=>x.id===el.dataset.id);$("buy-id").value=m.id;s.value=`${m.codigo?m.codigo+" - ":""}${m.nome}`;$("buy-cost").value=Number(m.custo||0);box.classList.add("hidden")})};
+ const s=$("buy-search"),box=$("buy-suggestions");s.oninput=()=>{const q=s.value;$("buy-id").value="";if(!q.trim())return box.classList.add("hidden");const found=materiais.filter(m=>smartSearch(m,q)).slice(0,30);box.innerHTML=found.map(m=>`<div class="suggestion" data-id="${m.id}">${esc(m.codigo||"")} ${esc(m.nome)} — custo ${money(m.custo)}</div>`).join("");box.classList.remove("hidden");box.querySelectorAll("[data-id]").forEach(el=>el.onclick=()=>{const m=materiais.find(x=>x.id===el.dataset.id);$("buy-id").value=m.id;s.value=`${m.codigo?m.codigo+" - ":""}${m.nome}`;$("buy-cost").value=Number(m.custo||0);box.classList.add("hidden")})};
  function draw(){ $("buy-items").innerHTML=editorItens.map((i,n)=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td><td><button type="button" class="action-btn" data-rm="${n}">Remover</button></td></tr>`).join("")||'<tr><td colspan="5">Sem itens.</td></tr>';$("buy-total").textContent=money(editorItens.reduce((a,i)=>a+i.quantidade*i.valor_unitario,0));document.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{editorItens.splice(Number(b.dataset.rm),1);draw()})}
  $("buy-add").onclick=()=>{const id=$("buy-id").value,q=Number($("buy-qtd").value),c=Number($("buy-cost").value);const m=materiais.find(x=>x.id===id);if(!m||q<=0)return toast("Selecione um material.");editorItens.push({referencia_id:id,descricao:m.nome,quantidade:q,valor_unitario:c});s.value="";$("buy-id").value="";$("buy-qtd").value=1;$("buy-cost").value="";draw()};draw();
  $("entity-form").onsubmit=async e=>{e.preventDefault();if(!editorItens.length)return toast("Adicione materiais.");const total=editorItens.reduce((a,i)=>a+i.quantidade*i.valor_unitario,0);const {data,error}=await sb.from("compras").insert({fornecedor_id:$("f-fornecedor").value,data_compra:$("f-data").value,vencimento:$("f-vencimento").value||null,documento:$("f-documento").value.trim(),observacoes:$("f-obs").value.trim(),total,status:"rascunho"}).select().single();if(error)return toast(error.message);const r=await sb.from("compra_itens").insert(editorItens.map(i=>({compra_id:data.id,material_id:i.referencia_id,descricao:i.descricao,quantidade:i.quantidade,custo_unitario:i.valor_unitario})));if(r.error)return toast(r.error.message);closeModal();await loadCompras();renderCompras();toast("Compra criada")};
@@ -461,7 +487,7 @@ async function viewCompra(id){const c=compras.find(x=>x.id===id);const {data,err
 async function confirmCompra(id){if(!confirm("Confirmar compra? Isso dará entrada no estoque e criará a conta a pagar."))return;const {data,error}=await sb.rpc("confirmar_compra",{p_compra_id:id});if(error)return toast(error.message);await Promise.all([loadCompras(),loadMateriais(),loadFinanceiro()]);renderCompras();renderDashboard();toast(data)}
 
 function renderUsuarios(){
- const q=$("usuario-search").value.toLowerCase(), rows=usuarios.filter(u=>[u.nome,u.email,u.tipo,u.cargos?.nome].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("usuario-search").value, rows=usuarios.filter(u=>smartSearch(u,q));
  $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
 }
 function usuarioForm(u={}){
@@ -489,11 +515,11 @@ async function editOS(id){
 }
 
 function renderTecnicos(){
- const q=$("tecnico-search").value.toLowerCase(), rows=tecnicos.filter(t=>[t.nome,t.funcao,t.telefone,t.email].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("tecnico-search").value, rows=tecnicos.filter(t=>smartSearch(t,q));
  $("tecnicos-table").innerHTML=rows.map(t=>`<tr><td><b>${esc(t.nome)}</b></td><td>${esc(t.funcao||"-")}</td><td>${esc(t.telefone||"-")}</td><td>${esc(t.email||"-")}</td><td>${t.ativo?"Ativo":"Inativo"}</td><td><div class="actions"><button class="action-btn" onclick="editTecnico('${t.id}')">Editar</button><button class="action-btn" onclick="toggleTecnico('${t.id}',${!t.ativo})">${t.ativo?"Inativar":"Ativar"}</button></div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum técnico.</td></tr>';
 }
 function tecnicoForm(t={}){
- openModal(t.id?"Editar técnico":"Novo técnico",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(t.nome)}"></label><label>Função<input id="f-funcao" value="${esc(t.funcao)}"></label><label>Telefone<input id="f-telefone" value="${esc(t.telefone)}"></label><label>E-mail<input id="f-email" type="email" value="${esc(t.email)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(t.observacoes)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ openModal(t.id?"Editar técnico":"Novo técnico",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(t.nome)}"></label><label>Função<input id="f-funcao" value="${esc(t.funcao)}"></label><label>Telefone<input id="f-telefone" data-mask="phone" inputmode="numeric" value="${esc(t.telefone)}"></label><label>E-mail<input id="f-email" type="email" value="${esc(t.email)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(t.observacoes)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
  $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),funcao:$("f-funcao").value.trim(),telefone:$("f-telefone").value.trim(),email:$("f-email").value.trim(),observacoes:$("f-obs").value.trim()};const r=t.id?await sb.from("tecnicos").update(obj).eq("id",t.id):await sb.from("tecnicos").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadTecnicos();renderTecnicos();toast("Técnico salvo")};
 }
 function editTecnico(id){const t=tecnicos.find(x=>x.id===id);if(t)tecnicoForm(t)}
@@ -555,21 +581,21 @@ function closeModal(){$("modal").classList.add("hidden");editorItens=[]}
 
 function clienteForm(c={}){
  let contatos=Array.isArray(c.contatos_json)?c.contatos_json:[];
- const contactsHTML=()=>contatos.map((x,n)=>`<div class="contact-row"><input data-cn="${n}" data-k="nome" placeholder="Nome" value="${esc(x.nome)}"><input data-cn="${n}" data-k="telefone" placeholder="Telefone" value="${esc(x.telefone)}"><input data-cn="${n}" data-k="email" placeholder="E-mail" value="${esc(x.email)}"><button type="button" class="action-btn" data-crm="${n}">Remover</button></div>`).join("");
+ const contactsHTML=()=>contatos.map((x,n)=>`<div class="contact-row"><input data-cn="${n}" data-k="nome" placeholder="Nome" value="${esc(x.nome)}"><input data-cn="${n}" data-k="telefone" data-mask="phone" inputmode="numeric" placeholder="Telefone" value="${esc(x.telefone)}"><input data-cn="${n}" data-k="email" placeholder="E-mail" value="${esc(x.email)}"><button type="button" class="action-btn" data-crm="${n}">Remover</button></div>`).join("");
  openModal(c.id?"Editar cliente":"Novo cliente",`<form id="entity-form"><div class="form-grid">
  <label>Tipo<select id="f-tipo"><option ${c.tipo_pessoa==="PF"?"selected":""}>PF</option><option ${c.tipo_pessoa==="PJ"?"selected":""}>PJ</option></select></label>
- <label>Nome / Razão social*<input id="f-nome" required value="${esc(c.nome)}"></label><label>CPF / CNPJ<input id="f-documento" value="${esc(c.documento)}"></label>
- <label>Telefone<input id="f-telefone" value="${esc(c.telefone)}"></label><label>Celular<input id="f-celular" value="${esc(c.celular)}"></label>
+ <label>Nome / Razão social*<input id="f-nome" required value="${esc(c.nome)}"></label><label>CPF / CNPJ<input id="f-documento" data-mask="document" inputmode="numeric" value="${esc(c.documento)}"></label>
+ <label>Telefone<input id="f-telefone" data-mask="phone" inputmode="numeric" value="${esc(c.telefone)}"></label><label>Celular<input id="f-celular" data-mask="cell" inputmode="numeric" value="${esc(c.celular)}"></label>
  <label>E-mail<input id="f-email" type="email" value="${esc(c.email)}"></label><label>E-mail cobrança<input id="f-cobranca" type="email" value="${esc(c.email_cobranca)}"></label>
- <label>CEP<input id="f-cep" value="${esc(c.cep)}"></label><label>Endereço<input id="f-endereco" value="${esc(c.endereco)}"></label>
+ <label>CEP<input id="f-cep" data-mask="cep" inputmode="numeric" value="${esc(c.cep)}"></label><label>Endereço<input id="f-endereco" value="${esc(c.endereco)}"></label>
  <label>Número<input id="f-numero" value="${esc(c.numero)}"></label><label>Complemento<input id="f-complemento" value="${esc(c.complemento)}"></label>
  <label>Bairro<input id="f-bairro" value="${esc(c.bairro)}"></label><label>Cidade<input id="f-cidade" value="${esc(c.cidade)}"></label>
  <label>Estado<input id="f-estado" maxlength="2" value="${esc(c.estado)}"></label>
  </div>
  <div id="pj-fields" class="pj-fields ${c.tipo_pessoa==="PJ"?"":"hidden"}"><b>Representante legal e contatos da empresa</b><div class="form-grid">
- <label>Representante legal<input id="f-rep-nome" value="${esc(c.representante_legal_nome)}"></label><label>CPF do representante<input id="f-rep-cpf" value="${esc(c.representante_legal_cpf)}"></label>
+ <label>Representante legal<input id="f-rep-nome" value="${esc(c.representante_legal_nome)}"></label><label>CPF do representante<input id="f-rep-cpf" data-mask="cpf" inputmode="numeric" value="${esc(c.representante_legal_cpf)}"></label>
  <label>Cargo / função<input id="f-rep-cargo" value="${esc(c.representante_legal_cargo)}"></label><label>E-mail<input id="f-rep-email" type="email" value="${esc(c.representante_legal_email)}"></label>
- <label>Telefone<input id="f-rep-tel" value="${esc(c.representante_legal_telefone)}"></label></div>
+ <label>Telefone<input id="f-rep-tel" data-mask="phone" inputmode="numeric" value="${esc(c.representante_legal_telefone)}"></label></div>
  <div id="contacts-box">${contactsHTML()}</div><button type="button" id="add-contact" class="btn secondary">+ Contato</button></div>
  <label class="span-2">Observações<textarea id="f-obs">${esc(c.observacoes)}</textarea></label>
  <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
@@ -850,7 +876,7 @@ function enhanceSearchableSelect(select){
  function syncButton(){button.textContent=selectedText()||"Selecione..."}
  function render(){
    const q=norm(input.value);
-   const list=[...select.options].filter(op=>!op.disabled && (!q || norm(op.textContent).includes(q)));
+   const list=[...select.options].filter(op=>!op.disabled && (!q || smartSearch(op.textContent,q)));
    options.innerHTML=list.length?list.map(op=>`<button type="button" class="searchable-option ${op.selected?"selected":""}" data-value="${encodeURIComponent(op.value)}">${esc(op.textContent)}</button>`).join("")
      :'<div class="searchable-empty">Nenhuma opção encontrada.</div>';
    options.querySelectorAll(".searchable-option").forEach(el=>el.onclick=()=>{
@@ -903,7 +929,7 @@ function renderCatalogoBase(){
  const t=$("catalogo-table");if(!t)return;
  const n=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
  const q=n($("catalogo-busca")?.value);
- const rows=catalogoBase.filter(x=>n([x.codigo,x.descricao,x.categoria,x.fabricante].join(" ")).includes(q));
+ const rows=catalogoBase.filter(x=>smartSearch(x,q));
  t.innerHTML=rows.map(x=>`<tr><td><b>${esc(x.codigo)}</b></td><td>${esc(x.descricao)}</td><td>${esc(x.categoria||"")}</td><td>${esc(x.unidade||"")}</td><td>${esc(x.fabricante||"")}</td><td><div class="action-group"><button class="action-btn" onclick="catalogoForm(catalogoBase.find(y=>y.id==='${x.id}'))">Editar</button><button class="action-btn danger" onclick="deleteCatalogoItem('${x.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum material encontrado.</td></tr>';
 }
 function catalogoForm(x={}){
@@ -924,7 +950,7 @@ async function abrirCatalogoEmpresa(){
  const {data,error}=await sb.rpc("listar_catalogo_disponivel_v15");if(error)return toast(error.message);const lista=data||[];
  openModal("Adicionar do Catálogo Core-Orça",`<div><input id="cat-busca" placeholder="Pesquisar no catálogo..."><div class="catalog-actions"><button type="button" id="cat-marcar" class="btn secondary">Selecionar visíveis</button><button type="button" id="cat-todos" class="btn secondary">Importar catálogo completo</button></div><div id="cat-list" class="catalog-check-list"></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button type="button" id="cat-importar" class="btn primary">Adicionar selecionados</button></div></div>`);
  const n=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();let vis=[];
- function draw(){const q=n($("cat-busca").value);vis=lista.filter(x=>n([x.codigo,x.descricao,x.categoria,x.fabricante].join(" ")).includes(q));$("cat-list").innerHTML=vis.map(x=>`<label class="catalog-check"><input type="checkbox" value="${x.id}" ${x.ja_importado?"disabled":""}><span><b>${esc(x.codigo)}</b> — ${esc(x.descricao)}<small>${esc(x.categoria||"")}${x.ja_importado?" • Já adicionado":""}</small></span></label>`).join("");}
+ function draw(){const q=n($("cat-busca").value);vis=lista.filter(x=>smartSearch(x,q));$("cat-list").innerHTML=vis.map(x=>`<label class="catalog-check"><input type="checkbox" value="${x.id}" ${x.ja_importado?"disabled":""}><span><b>${esc(x.codigo)}</b> — ${esc(x.descricao)}<small>${esc(x.categoria||"")}${x.ja_importado?" • Já adicionado":""}</small></span></label>`).join("");}
  $("cat-busca").oninput=draw;$("cat-marcar").onclick=()=>document.querySelectorAll("#cat-list input:not(:disabled)").forEach(c=>c.checked=true);
  $("cat-importar").onclick=async()=>{const ids=[...document.querySelectorAll("#cat-list input:checked")].map(c=>c.value);if(!ids.length)return toast("Selecione ao menos um material.");const r=await sb.rpc("importar_catalogo_v15",{p_catalogo_ids:ids});if(r.error)return toast(r.error.message);closeModal();await refreshAll();toast(`${r.data||0} material(is) adicionado(s).`);};
  $("cat-todos").onclick=async()=>{
@@ -963,3 +989,31 @@ document.addEventListener("DOMContentLoaded",()=>{
    setTimeout(applyCatalogPermission,250);
  }
 });
+
+
+/* V15.4 — máscaras brasileiras */
+function onlyDigits(v){return String(v??"").replace(/\D/g,"")}
+function maskCPF(v){let d=onlyDigits(v).slice(0,11);return d.replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d)/,"$1.$2").replace(/(\d{3})(\d{1,2})$/,"$1-$2")}
+function maskCNPJ(v){let d=onlyDigits(v).slice(0,14);return d.replace(/^(\d{2})(\d)/,"$1.$2").replace(/^(\d{2})\.(\d{3})(\d)/,"$1.$2.$3").replace(/\.(\d{3})(\d)/,".$1/$2").replace(/(\d{4})(\d)/,"$1-$2")}
+function maskDocument(v){const d=onlyDigits(v);return d.length>11?maskCNPJ(d):maskCPF(d)}
+function maskCEP(v){let d=onlyDigits(v).slice(0,8);return d.replace(/(\d{5})(\d)/,"$1-$2")}
+function maskPhone(v){
+ let d=onlyDigits(v).slice(0,11);
+ if(d.length<=10)return d.replace(/^(\d{2})(\d)/,"($1) $2").replace(/(\d{4})(\d)/,"$1-$2");
+ return d.replace(/^(\d{2})(\d)/,"($1) $2").replace(/(\d{5})(\d)/,"$1-$2");
+}
+function applyInputMask(el,type){
+ if(!el)return;
+ const fn={cpf:maskCPF,cnpj:maskCNPJ,document:maskDocument,cep:maskCEP,phone:maskPhone,cell:maskPhone}[type];
+ if(!fn)return;
+ const run=()=>{el.value=fn(el.value)};
+ el.addEventListener("input",run);el.addEventListener("blur",run);run();
+}
+function applyDeclaredMasks(root=document){
+ root.querySelectorAll("[data-mask]").forEach(el=>{
+   if(el.dataset.maskReady==="1")return;
+   el.dataset.maskReady="1";applyInputMask(el,el.dataset.mask);
+ });
+}
+const maskObserver=new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1)applyDeclaredMasks(n)})));
+document.addEventListener("DOMContentLoaded",()=>{applyDeclaredMasks();maskObserver.observe(document.body,{childList:true,subtree:true})});

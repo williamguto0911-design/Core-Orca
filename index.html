@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>Manutenção Elétrica</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="brand-mark">⚡</div>
+    <h1>Manutenção Elétrica</h1>
+    <p class="muted">Gestão de clientes, materiais e estoque</p>
+    <form id="login-form">
+      <label>E-mail<input id="login-email" type="email" required autocomplete="email"></label>
+      <label>Senha<input id="login-password" type="password" required autocomplete="current-password"></label>
+      <button class="btn primary full" type="submit">Entrar</button>
+      <p id="login-error" class="error"></p>
+    </form>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <aside class="sidebar">
+    <div class="brand"><span>⚡</span><div><strong>Manutenção</strong><small>Elétrica</small></div></div>
+    <nav>
+      <button class="nav-item active" data-page="dashboard">▦ <span>Dashboard</span></button>
+      <button class="nav-item" data-page="clientes">👥 <span>Clientes</span></button>
+      <button class="nav-item" data-page="materiais">📦 <span>Materiais</span></button>
+      <button class="nav-item" data-page="estoque">⇅ <span>Estoque</span></button>
+    </nav>
+    <button id="logout-btn" class="logout">Sair</button>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <button id="menu-btn" class="icon-btn mobile-only">☰</button>
+      <div>
+        <h2 id="page-title">Dashboard</h2>
+        <span id="user-email" class="muted"></span>
+      </div>
+      <button id="refresh-btn" class="icon-btn" title="Atualizar">↻</button>
+    </header>
+
+    <section id="page-dashboard" class="page">
+      <div class="stats">
+        <div class="stat-card"><span>Clientes</span><strong id="stat-clientes">0</strong><small>Cadastrados</small></div>
+        <div class="stat-card"><span>Materiais</span><strong id="stat-materiais">0</strong><small>Ativos</small></div>
+        <div class="stat-card warning"><span>Estoque baixo</span><strong id="stat-baixo">0</strong><small>Abaixo do mínimo</small></div>
+        <div class="stat-card"><span>Valor do estoque</span><strong id="stat-valor">R$ 0,00</strong><small>Custo estimado</small></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><h3>Acesso rápido</h3><p>Principais ações do sistema</p></div></div>
+        <div class="quick-actions">
+          <button class="quick" data-page="clientes">👤<b>Novo cliente</b><span>Cadastrar cliente</span></button>
+          <button class="quick" data-page="materiais">📦<b>Novo material</b><span>Cadastrar material</span></button>
+          <button class="quick" data-page="estoque">⇅<b>Movimentar estoque</b><span>Entrada ou saída</span></button>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-clientes" class="page hidden">
+      <div class="toolbar">
+        <input id="cliente-search" class="search" placeholder="🔎 Buscar por nome, documento ou telefone...">
+        <button id="novo-cliente" class="btn primary">+ Novo cliente</button>
+      </div>
+      <div class="panel"><div class="table-wrap"><table>
+        <thead><tr><th>Cliente</th><th>Tipo</th><th>Documento</th><th>Contato</th><th>Cidade</th><th>Ações</th></tr></thead>
+        <tbody id="clientes-table"></tbody>
+      </table></div></div>
+    </section>
+
+    <section id="page-materiais" class="page hidden">
+      <div class="toolbar">
+        <input id="material-search" class="search" placeholder="🔎 Buscar material por código, nome, categoria...">
+        <div class="toolbar-actions">
+          <button id="importar-csv" class="btn secondary">⇧ Importar CSV</button>
+          <input id="csv-file" type="file" accept=".csv,text/csv" class="hidden">
+          <button id="novo-material" class="btn primary">+ Novo material</button>
+        </div>
+      </div>
+      <div class="hint">Importe seus ~1.500 materiais em CSV. Colunas aceitas: código, nome, descrição, categoria, fabricante, unidade, estoque_atual, estoque_minimo, custo, preco_venda.</div>
+      <div class="panel"><div class="table-wrap"><table>
+        <thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>Un.</th><th>Estoque</th><th>Custo</th><th>Preço</th><th>Ações</th></tr></thead>
+        <tbody id="materiais-table"></tbody>
+      </table></div></div>
+    </section>
+
+    <section id="page-estoque" class="page hidden">
+      <div class="toolbar">
+        <input id="estoque-search" class="search" placeholder="🔎 Buscar material...">
+        <button id="nova-movimentacao" class="btn primary">+ Movimentar estoque</button>
+      </div>
+      <div class="panel"><div class="table-wrap"><table>
+        <thead><tr><th>Material</th><th>Estoque atual</th><th>Mínimo</th><th>Status</th><th>Última atualização</th></tr></thead>
+        <tbody id="estoque-table"></tbody>
+      </table></div></div>
+    </section>
+  </main>
+</div>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head"><h3 id="modal-title"></h3><button id="modal-close" class="icon-btn">×</button></div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

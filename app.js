@@ -603,18 +603,88 @@ function itemEditorHTML(){
  return `<div class="item-builder"><b>Itens</b><div class="form-grid"><label>Tipo<select id="item-tipo"><option value="material">Material</option><option value="servico">Serviço</option></select></label><label>Pesquisar<input id="item-search" autocomplete="off" placeholder="Digite parte do código ou nome..."><div id="item-suggestions" class="suggestions hidden"></div></label><label>Quantidade<input id="item-qtd" type="number" min="0.001" step="0.001" value="1"></label><label>Valor unitário<input id="item-valor" type="number" min="0" step="0.01"></label></div><input id="item-id" type="hidden"><button type="button" id="add-item" class="btn secondary">Adicionar item</button><div class="items-table"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th><th></th></tr></thead><tbody id="editor-itens"></tbody></table></div><div class="totals"><span>Subtotal: <span id="editor-subtotal">R$ 0,00</span></span><span>Total: <span id="editor-total">R$ 0,00</span></span></div></div>`;
 }
 function setupItemEditor(){
- const search=$("item-search"), suggestions=$("item-suggestions");
- function clearSelection(){$("item-id").value="";$("item-valor").value=""}
- function suggest(){
-  const q=search.value.trim().toLowerCase();clearSelection();if(!q){suggestions.classList.add("hidden");return}
-  const tipo=$("item-tipo").value;const source=tipo==="material"?materiais:servicos;
-  const found=source.filter(x=>[x.codigo,x.nome,x.categoria].some(v=>String(v||"").toLowerCase().includes(q))).slice(0,20);
-  suggestions.innerHTML=found.map(x=>`<div class="suggestion" data-id="${x.id}"><b>${esc(x.codigo||"")}</b> ${esc(x.nome)} <span class="muted">— ${money(tipo==="material"?x.preco_venda:x.valor)}</span></div>`).join("")||`<div class="suggestion muted">Nenhum resultado</div>`;
-  suggestions.classList.remove("hidden");
-  suggestions.querySelectorAll("[data-id]").forEach(el=>el.onclick=()=>{const x=source.find(y=>y.id===el.dataset.id);$("item-id").value=x.id;search.value=`${x.codigo?x.codigo+" - ":""}${x.nome}`;$("item-valor").value=tipo==="material"?Number(x.preco_venda||0):Number(x.valor||0);suggestions.classList.add("hidden")});
+ const search=$("item-search"), suggestions=$("item-suggestions"), tipoEl=$("item-tipo");
+ const idEl=$("item-id"), valorEl=$("item-valor"), qtdEl=$("item-qtd"), addEl=$("add-item");
+ let timer=null;
+
+ const normalize=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+ const clearSelection=()=>{idEl.value="";valorEl.value=""};
+ const hideSuggestions=()=>{suggestions.innerHTML="";suggestions.classList.add("hidden")};
+
+ function doSearch(){
+   const words=normalize(search.value).split(/\s+/).filter(Boolean);
+   clearSelection();
+   if(!words.length){hideSuggestions();return}
+
+   const tipo=tipoEl.value;
+   const source=tipo==="material"?materiais:servicos;
+   const found=source.filter(x=>{
+     const text=normalize([x.codigo,x.nome,x.descricao,x.categoria,x.fabricante].filter(Boolean).join(" "));
+     return words.every(w=>text.includes(w));
+   }).slice(0,30);
+
+   suggestions.innerHTML=found.length?found.map((x,i)=>`
+     <button type="button" class="suggestion suggestion-button" data-result="${i}">
+       <span><b>${esc(x.codigo||"")}</b>${x.codigo?" — ":""}${esc(x.nome||"")}${x.categoria?` <small>• ${esc(x.categoria)}</small>`:""}</span>
+       <span class="muted">${money(tipo==="material"?Number(x.preco_venda||0):Number(x.valor||0))}</span>
+     </button>`).join(""):`<div class="suggestion muted">Nenhum resultado encontrado.</div>`;
+   suggestions.classList.remove("hidden");
+
+   suggestions.querySelectorAll("[data-result]").forEach(el=>el.onclick=()=>{
+     const x=found[Number(el.dataset.result)];
+     if(!x)return;
+     idEl.value=x.id;
+     search.value=`${x.codigo?x.codigo+" - ":""}${x.nome||""}`;
+     valorEl.value=tipo==="material"?Number(x.preco_venda||0):Number(x.valor||0);
+     hideSuggestions();
+   });
  }
- search.oninput=suggest;$("item-tipo").onchange=()=>{search.value="";clearSelection();suggestions.classList.add("hidden")};
- $("add-item").onclick=async()=>{const tipo=$("item-tipo").value,id=$("item-id").value,qtd=Number($("item-qtd").value),valor=Number($("item-valor").value);if(!id||qtd<=0)return toast("Selecione um item pela lista de resultados.");const source=tipo==="material"?materiais:servicos;const x=source.find(y=>y.id===id);if(!x)return toast("Item não encontrado.");editorItens.push({tipo,referencia_id:id,descricao:x.nome,quantidade:qtd,valor_unitario:valor});if(tipo==="servico"){const {data,error}=await sb.from("servico_materiais").select("*").eq("servico_id",id);if(!error)(data||[]).forEach(sm=>{const m=materiais.find(mm=>mm.id===sm.material_id);if(m)editorItens.push({tipo:"material",referencia_id:m.id,descricao:`${m.nome} (material do serviço ${x.nome})`,quantidade:Number(sm.quantidade)*qtd,valor_unitario:Number(m.preco_venda||0),origem_servico_id:id})})}search.value="";$("item-id").value="";$("item-valor").value="";$("item-qtd").value=1;suggestions.classList.add("hidden");renderEditorItens()};
+
+ search.addEventListener("input",()=>{
+   clearTimeout(timer);
+   timer=setTimeout(doSearch,50);
+ });
+ search.addEventListener("focus",()=>{if(search.value.trim())doSearch()});
+ search.addEventListener("keydown",e=>{if(e.key==="Escape")hideSuggestions()});
+
+ tipoEl.addEventListener("change",()=>{
+   search.value="";
+   clearSelection();
+   hideSuggestions();
+   search.focus();
+ });
+
+ addEl.onclick=async()=>{
+   const tipo=tipoEl.value,id=idEl.value,qtd=Number(qtdEl.value),valor=Number(valorEl.value);
+   if(!id||qtd<=0)return toast("Selecione um item pela lista de resultados.");
+   const source=tipo==="material"?materiais:servicos;
+   const x=source.find(y=>String(y.id)===String(id));
+   if(!x)return toast("Item não encontrado.");
+
+   editorItens.push({tipo,referencia_id:id,descricao:x.nome,quantidade:qtd,valor_unitario:valor});
+
+   if(tipo==="servico"){
+     const {data,error}=await sb.from("servico_materiais").select("*").eq("servico_id",id);
+     if(error){
+       console.error("Erro ao carregar materiais vinculados:",error);
+       toast("Serviço adicionado, mas houve erro ao carregar os materiais vinculados.");
+     }else{
+       (data||[]).forEach(sm=>{
+         const mat=materiais.find(mm=>String(mm.id)===String(sm.material_id));
+         if(mat)editorItens.push({
+           tipo:"material",referencia_id:mat.id,
+           descricao:`${mat.nome} (material do serviço ${x.nome})`,
+           quantidade:Number(sm.quantidade||0)*qtd,
+           valor_unitario:Number(mat.preco_venda||0),
+           origem_servico_id:id
+         });
+       });
+     }
+   }
+
+   search.value="";idEl.value="";valorEl.value="";qtdEl.value=1;
+   hideSuggestions();renderEditorItens();search.focus();
+ };
  renderEditorItens();
 }
 function renderEditorItens(){

@@ -167,3 +167,9 @@
 .license-blocked{color:#b91c1c;font-weight:700}
 .force-password-note{padding:12px;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;margin-bottom:12px}
 @media(max-width:750px){.license-row{grid-template-columns:1fr}.action-group{width:100%}}
+
+/* V12 - busca parcial do editor de itens */
+#item-suggestions{z-index:100;max-height:300px;overflow-y:auto}
+.suggestion-button{display:flex!important;width:100%;justify-content:space-between;align-items:center;gap:12px;text-align:left;border:0;border-bottom:1px solid #e5e7eb;background:#fff;cursor:pointer}
+.suggestion-button:hover,.suggestion-button:focus{background:#f3f6fb;outline:none}
+.suggestion-button small{color:#6b7280}

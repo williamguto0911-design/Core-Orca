@@ -26,3 +26,8 @@
 .logo-preview{max-width:180px;max-height:80px;object-fit:contain;margin:8px 0}.report-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .purchase-items{margin-top:12px}.permission-note{font-size:12px;color:#6b7280;margin-top:8px}
 @media(max-width:850px){.admin-only.restricted{display:none!important}}
+
+.alert-panel{margin-bottom:16px}.panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.alerts-list{display:grid;gap:8px}.alert-item{padding:10px 12px;border:1px solid #e5e7eb;border-radius:9px;background:#fff}
+.alert-item strong{display:block;margin-bottom:3px}.alert-item.warning{border-left:4px solid #f59e0b}.alert-item.danger{border-left:4px solid #dc2626}.alert-item.info{border-left:4px solid #2563eb}
+.report-filters label{display:flex;align-items:center;gap:6px}.report-filters input{min-width:145px}

@@ -36,6 +36,7 @@
         <button class="nav-item" data-page="tecnicos">Técnicos</button>
         <button class="nav-item" data-page="fornecedores">Fornecedores</button>
         <button class="nav-item" data-page="compras">Compras</button>
+        <button class="nav-item" data-page="relatorios">Relatórios</button>
         <button class="nav-item admin-only" data-page="usuarios">Usuários</button>
         <button class="nav-item" data-page="configuracoes">Configurações</button>
       </nav>
@@ -60,6 +61,10 @@
           <article><span>Valor em estoque</span><strong id="stat-valor">R$ 0,00</strong></article>
           <article><span>Orçamentos abertos</span><strong id="stat-orcamentos">0</strong></article>
           <article><span>OS em aberto</span><strong id="stat-os">0</strong></article>
+        </div>
+        <div class="panel alert-panel">
+          <div class="panel-head"><h3>Alertas</h3><button id="refresh-alerts" class="action-btn">Atualizar</button></div>
+          <div id="dashboard-alerts" class="alerts-list"></div>
         </div>
         <div class="dashboard-grid">
           <div class="panel">
@@ -140,6 +145,30 @@
       <section id="page-compras" class="page hidden">
         <div class="toolbar"><input id="compra-search" placeholder="Pesquisar compra ou fornecedor..."><button id="nova-compra" class="btn primary">+ Compra</button></div>
         <div class="table-wrap"><table><thead><tr><th>Nº</th><th>Fornecedor</th><th>Data</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody id="compras-table"></tbody></table></div>
+      </section>
+
+      <section id="page-relatorios" class="page hidden">
+        <div class="panel">
+          <h3>Relatórios gerenciais</h3>
+          <div class="report-filters">
+            <label>De <input id="rel-inicio" type="date"></label>
+            <label>Até <input id="rel-fim" type="date"></label>
+            <button id="rel-aplicar" class="btn primary">Aplicar</button>
+            <button id="rel-export-fin" class="btn secondary">Exportar financeiro CSV</button>
+            <button id="rel-export-os" class="btn secondary">Exportar OS CSV</button>
+            <button id="rel-export-mat" class="btn secondary">Exportar materiais CSV</button>
+          </div>
+          <div class="stats">
+            <article><span>Receitas recebidas</span><strong id="rel-receitas">R$ 0,00</strong></article>
+            <article><span>Despesas pagas</span><strong id="rel-despesas">R$ 0,00</strong></article>
+            <article><span>Resultado</span><strong id="rel-resultado">R$ 0,00</strong></article>
+            <article><span>OS concluídas</span><strong id="rel-os">0</strong></article>
+          </div>
+          <div class="dashboard-grid">
+            <div class="panel"><h3>Financeiro por status</h3><div id="rel-fin-status" class="compact-list"></div></div>
+            <div class="panel"><h3>Materiais com estoque baixo</h3><div id="rel-low-stock" class="compact-list"></div></div>
+          </div>
+        </div>
       </section>
 
       <section id="page-usuarios" class="page hidden admin-only">

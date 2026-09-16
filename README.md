@@ -1,40 +1,46 @@
-# Core-Orca V5
+# Core-Orca V6
 
-## Novidades
-- Edição de orçamento existente.
-- Duplicação de orçamento.
-- Edição dos principais dados/status da OS.
-- Cadastro de fornecedores.
-- Compras com itens de material.
-- Confirmação da compra gera entrada automática no estoque.
-- Confirmação da compra gera conta a pagar no Financeiro.
-- Cadastro de perfis: Administrador, Escritório e Técnico.
-- Restrições de menus para Técnico.
-- Logo da empresa nos documentos.
-- Mantém fotos, assinatura, agenda, financeiro, histórico, estoque e demais funções anteriores.
+## Foco da V6
+Esta versão prioriza gestão, relatórios, exportação e segurança.
+
+### Novidades
+- Relatórios gerenciais por período.
+- Receitas recebidas, despesas pagas e resultado.
+- Quantidade de OS concluídas no período.
+- Resumo financeiro por status.
+- Lista de materiais com estoque baixo.
+- Exportação CSV do Financeiro.
+- Exportação CSV das Ordens de Serviço.
+- Exportação CSV dos Materiais.
+- Alertas no Dashboard:
+  - estoque baixo;
+  - lançamentos vencidos;
+  - vencimentos nos próximos 7 dias;
+  - compromissos do dia.
+- PDFs/Impressão com layout A4 melhorado.
+- RLS mais restritiva no Supabase:
+  - Financeiro: Administrador e Escritório;
+  - Fornecedores/Compras: Administrador e Escritório;
+  - Configurações: todos autenticados podem ler, somente Administrador altera;
+  - Perfis: Administrador gerencia, usuário pode consultar o próprio perfil.
 
 ## Instalação
-1. Não apague a V4 nem seus dados.
-2. Execute `supabase-v5.sql` no SQL Editor do Supabase.
-3. Se não houver erro, substitua no GitHub:
+1. Não apague a V5 ou seus dados.
+2. Execute `supabase-v6.sql` no SQL Editor do Supabase.
+3. Se o SQL executar sem erro, substitua no GitHub:
    - index.html
    - style.css
    - app.js
-4. Commit na main e Ctrl+F5.
+4. Faça commit na `main`.
+5. Aguarde o GitHub Pages e pressione Ctrl+F5.
 
-## Perfis
-A V5 introduz os perfis sem endurecer imediatamente todas as políticas RLS do banco, para evitar bloquear os logins existentes.
-O primeiro login sem perfil cadastrado continua sendo tratado como administrador pela aplicação.
-Depois, em Usuários, associe os e-mails aos perfis desejados.
+## Importante sobre usuários
+A função de perfil usa o e-mail autenticado no Supabase Auth e procura o mesmo e-mail em `usuarios_perfis`.
 
-Importante: criar um perfil no Core-Orca não cria a senha/login no Supabase Auth. A conta de autenticação ainda deve existir no Supabase.
+Para preservar seu acesso durante a atualização, um login que ainda não tenha perfil cadastrado é tratado como Administrador. Depois que todos os usuários estiverem configurados, podemos remover esse fallback numa próxima migração e exigir perfil explícito.
 
-## Compras
-A compra começa como Rascunho. Ao clicar em “Confirmar entrada”:
-- os materiais entram no estoque;
-- o custo cadastrado do material é atualizado para o custo da compra;
-- uma despesa pendente é criada no Financeiro;
-- a mesma compra não pode lançar estoque duas vezes.
+## CSV
+Os arquivos são gerados com separador `;` e BOM UTF-8, facilitando a abertura no Excel em português do Brasil.
 
-## Logo
-Em Configurações, selecione PNG, JPEG ou WebP. O arquivo é salvo no bucket `empresa-assets` e usado nos documentos.
+## Alertas
+Os alertas são calculados ao carregar os dados atuais. Não enviam notificações fora do sistema; eles aparecem no Dashboard.

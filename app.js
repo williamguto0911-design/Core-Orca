@@ -37,6 +37,7 @@ function renderCurrent(){
   if(currentPage==="fornecedores")renderFornecedores();
   if(currentPage==="compras")renderCompras();
   if(currentPage==="usuarios")renderUsuarios();
+  if(currentPage==="relatorios")renderRelatorios();
 }
 async function loadClientes(){const {data,error}=await sb.from("clientes").select("*").eq("ativo",true).order("nome");if(error)return toast("Clientes: "+error.message);clientes=data||[]}
 async function loadMateriais(){const {data,error}=await sb.from("materiais").select("*").eq("ativo",true).order("nome");if(error)return toast("Materiais: "+error.message);materiais=data||[]}
@@ -76,11 +77,12 @@ function renderDashboard(){
   const despesas=financeiro.filter(f=>f.tipo==="despesa"&&f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
   $("dash-recebido").textContent=money(recebido);$("dash-receber").textContent=money(receber);$("dash-despesas").textContent=money(despesas);$("dash-resultado").textContent=money(recebido-despesas);
   $("dash-os-recentes").innerHTML=ordens.slice(0,6).map(o=>`<div class="compact-item"><span><b>${esc(o.numero)}</b><br><small>${esc(o.clientes?.nome||"-")}</small></span><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></div>`).join("")||'<span class="muted">Nenhuma OS.</span>';
+  renderAlerts();
 }
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 function renderClientes(){
@@ -136,6 +138,55 @@ async function markPaid(id){const {error}=await sb.from("financeiro").update({st
 async function deleteFinance(id){if(!confirm("Excluir lançamento?"))return;const {error}=await sb.from("financeiro").delete().eq("id",id);if(error)return toast(error.message);await loadFinanceiro();renderFinanceiro()}
 
 
+
+
+function renderAlerts(){
+ const box=$("dashboard-alerts");if(!box)return;
+ const todayStr=today(), in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().slice(0,10);
+ const alerts=[];
+ const low=materiais.filter(m=>Number(m.estoque_atual)<=Number(m.estoque_minimo));
+ if(low.length)alerts.push({type:"warning",title:`${low.length} material(is) com estoque baixo`,text:low.slice(0,4).map(m=>`${m.codigo?m.codigo+" - ":""}${m.nome}`).join(", ")+(low.length>4?"...":"")});
+ const overdue=financeiro.filter(f=>f.status==="pendente"&&f.vencimento&&f.vencimento<todayStr);
+ if(overdue.length)alerts.push({type:"danger",title:`${overdue.length} lançamento(s) financeiro(s) vencido(s)`,text:`Total vencido: ${money(overdue.reduce((s,f)=>s+Number(f.valor),0))}`});
+ const soon=financeiro.filter(f=>f.status==="pendente"&&f.vencimento&&f.vencimento>=todayStr&&f.vencimento<=in7s);
+ if(soon.length)alerts.push({type:"info",title:`${soon.length} vencimento(s) nos próximos 7 dias`,text:`Total: ${money(soon.reduce((s,f)=>s+Number(f.valor),0))}`});
+ const ag=agenda.filter(a=>a.status!=="cancelado"&&a.status!=="concluido"&&String(a.inicio).slice(0,10)===todayStr);
+ if(ag.length)alerts.push({type:"info",title:`${ag.length} compromisso(s) hoje`,text:ag.slice(0,4).map(a=>a.titulo).join(", ")});
+ box.innerHTML=alerts.map(a=>`<div class="alert-item ${a.type}"><strong>${esc(a.title)}</strong><span>${esc(a.text)}</span></div>`).join("")||'<div class="alert-item"><strong>Nenhum alerta crítico</strong><span>Estoque, agenda e financeiro sem alertas para exibir.</span></div>';
+}
+function reportRange(){
+ let ini=$("rel-inicio")?.value, fim=$("rel-fim")?.value;
+ if(!ini||!fim){const d=new Date(), first=new Date(d.getFullYear(),d.getMonth(),1);ini=first.toISOString().slice(0,10);fim=today();if($("rel-inicio"))$("rel-inicio").value=ini;if($("rel-fim"))$("rel-fim").value=fim}
+ return {ini,fim};
+}
+function renderRelatorios(){
+ const {ini,fim}=reportRange();
+ const fin=financeiro.filter(f=>{const d=String(f.data_pagamento||f.vencimento||f.created_at||"").slice(0,10);return d>=ini&&d<=fim});
+ const receitas=fin.filter(f=>f.tipo!=="despesa"&&f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
+ const despesas=fin.filter(f=>f.tipo==="despesa"&&f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
+ const os=ordens.filter(o=>o.status==="concluida"&&String(o.data_conclusao||"").slice(0,10)>=ini&&String(o.data_conclusao||"").slice(0,10)<=fim);
+ $("rel-receitas").textContent=money(receitas);$("rel-despesas").textContent=money(despesas);$("rel-resultado").textContent=money(receitas-despesas);$("rel-os").textContent=os.length;
+ const groups=["pendente","pago","cancelado"].map(st=>({st,total:fin.filter(f=>f.status===st).reduce((s,f)=>s+Number(f.valor),0),n:fin.filter(f=>f.status===st).length}));
+ $("rel-fin-status").innerHTML=groups.map(g=>`<div class="compact-item"><span>${statusLabel(g.st)} (${g.n})</span><b>${money(g.total)}</b></div>`).join("");
+ const low=materiais.filter(m=>Number(m.estoque_atual)<=Number(m.estoque_minimo)).sort((a,b)=>Number(a.estoque_atual)-Number(b.estoque_atual));
+ $("rel-low-stock").innerHTML=low.slice(0,20).map(m=>`<div class="compact-item"><span>${esc(m.codigo||"")} ${esc(m.nome)}</span><b>${m.estoque_atual} ${esc(m.unidade||"")}</b></div>`).join("")||'<span class="muted">Nenhum material abaixo do mínimo.</span>';
+}
+function csvCell(v){const s=String(v??"");return `"${s.replaceAll('"','""')}"`}
+function downloadCSV(filename,headers,rows){
+ const content="\ufeff"+[headers.map(csvCell).join(";"),...rows.map(r=>r.map(csvCell).join(";"))].join("\r\n");
+ const blob=new Blob([content],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),500);
+}
+function exportFinanceiro(){
+ const {ini,fim}=reportRange(), rows=financeiro.filter(f=>{const d=String(f.data_pagamento||f.vencimento||f.created_at||"").slice(0,10);return d>=ini&&d<=fim});
+ downloadCSV(`financeiro_${ini}_${fim}.csv`,["Tipo","Descrição","Cliente","OS","Vencimento","Valor","Forma de pagamento","Status","Data pagamento"],rows.map(f=>[statusLabel(f.tipo||"receita"),f.descricao,f.clientes?.nome||"",f.ordens_servico?.numero||"",f.vencimento||"",Number(f.valor).toFixed(2),statusLabel(f.forma_pagamento||""),statusLabel(f.status),f.data_pagamento?new Date(f.data_pagamento).toLocaleString("pt-BR"):""]));
+}
+function exportOS(){
+ const {ini,fim}=reportRange(),rows=ordens.filter(o=>{const d=String(o.data_conclusao||o.created_at||"").slice(0,10);return d>=ini&&d<=fim});
+ downloadCSV(`ordens_servico_${ini}_${fim}.csv`,["Número","Cliente","Status","Responsável","Local","Total","Conclusão"],rows.map(o=>[o.numero,o.clientes?.nome||"",statusLabel(o.status),o.responsavel||"",o.local_servico||"",Number(o.total).toFixed(2),o.data_conclusao?new Date(o.data_conclusao).toLocaleString("pt-BR"):""]));
+}
+function exportMateriais(){
+ downloadCSV(`materiais_${today()}.csv`,["Código","Nome","Categoria","Unidade","Estoque atual","Estoque mínimo","Custo","Preço venda"],materiais.map(m=>[m.codigo||"",m.nome,m.categoria||"",m.unidade||"",m.estoque_atual,m.estoque_minimo,Number(m.custo).toFixed(2),Number(m.preco_venda).toFixed(2)]));
+}
 
 function renderFornecedores(){
  const q=$("fornecedor-search").value.toLowerCase(), rows=fornecedores.filter(f=>[f.nome,f.documento,f.telefone,f.email,f.cidade].some(v=>String(v||"").toLowerCase().includes(q)));
@@ -241,7 +292,7 @@ async function openSignature(osId){
 function printDocument(title,header,items,notes){
  const w=window.open("","_blank");if(!w)return toast("Permita pop-ups para gerar o PDF.");
  const rows=items.map(i=>`<tr><td>${esc(statusLabel(i.tipo))}</td><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("");
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h1{margin-bottom:4px}p{margin:5px 0}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:12px}th{background:#f3f4f6}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:18px}.muted{color:#666}</style></head><body>${companyHeader()}<h2>${esc(title)}</h2>${header}<table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>${notes||""}<p class="muted">${esc(empresa?.rodape_documentos||"")}</p><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:16mm}body{font-family:Arial,sans-serif;color:#111;font-size:12px}img{display:block;margin-bottom:8px}h1{font-size:20px;margin:0 0 3px}h2{font-size:17px;border-bottom:2px solid #111;padding-bottom:6px;margin-top:18px}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border-bottom:1px solid #ddd;padding:7px;text-align:left;font-size:11px}th{background:#f3f4f6}.total{text-align:right;font-size:17px;font-weight:bold;margin-top:16px}.muted{color:#666}.doc-footer{margin-top:28px;padding-top:8px;border-top:1px solid #ddd;font-size:10px;color:#666}@media print{button{display:none}}</style></head><body>${companyHeader()}<h2>${esc(title)}</h2>${header}<table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>${notes||""}<div class="doc-footer">${esc(empresa?.rodape_documentos||"")}</div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
 }
 async function printOrcamento(id){
  const o=orcamentos.find(x=>x.id===id);const {data,error}=await sb.from("orcamento_itens").select("*").eq("orcamento_id",id).order("ordem");if(error)return toast(error.message);
@@ -384,7 +435,7 @@ $("logout-btn").onclick=async()=>{await sb.auth.signOut();showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;
-$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
+$("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
 $("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;

@@ -31,6 +31,8 @@
         <button class="nav-item" data-page="estoque">Estoque</button>
         <button class="nav-item" data-page="orcamentos">Orçamentos</button>
         <button class="nav-item" data-page="os">Ordens de Serviço</button>
+        <button class="nav-item" data-page="agenda">Agenda</button>
+        <button class="nav-item" data-page="financeiro">Financeiro</button>
       </nav>
       <div class="sidebar-footer">
         <small id="user-email"></small>
@@ -94,6 +96,21 @@
         <div class="toolbar"><input id="os-search" placeholder="Pesquisar OS ou cliente..."><button id="nova-os" class="btn primary">+ Ordem de Serviço</button></div>
         <div class="table-wrap"><table><thead><tr><th>Nº</th><th>Cliente</th><th>Abertura</th><th>Responsável</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody id="os-table"></tbody></table></div>
       </section>
+
+      <section id="page-agenda" class="page hidden">
+        <div class="toolbar"><input id="agenda-search" placeholder="Pesquisar compromisso, cliente ou responsável..."><button id="novo-agendamento" class="btn primary">+ Agendamento</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Data/Hora</th><th>Compromisso</th><th>Cliente</th><th>Responsável</th><th>Status</th><th></th></tr></thead><tbody id="agenda-table"></tbody></table></div>
+      </section>
+
+      <section id="page-financeiro" class="page hidden">
+        <div class="stats finance-stats">
+          <article><span>A receber</span><strong id="fin-receber">R$ 0,00</strong></article>
+          <article><span>Recebido</span><strong id="fin-recebido">R$ 0,00</strong></article>
+          <article><span>Vencido</span><strong id="fin-vencido">R$ 0,00</strong></article>
+        </div>
+        <div class="toolbar"><input id="financeiro-search" placeholder="Pesquisar lançamento, cliente ou status..."><button id="novo-lancamento" class="btn primary">+ Lançamento</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Cliente</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="financeiro-table"></tbody></table></div>
+      </section>
     </main>
   </div>
 
@@ -106,6 +123,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/signature_pad@5.0.4/dist/signature_pad.umd.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

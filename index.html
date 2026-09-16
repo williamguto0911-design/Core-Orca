@@ -33,6 +33,8 @@
         <button class="nav-item" data-page="os">Ordens de Serviço</button>
         <button class="nav-item" data-page="agenda">Agenda</button>
         <button class="nav-item" data-page="financeiro">Financeiro</button>
+        <button class="nav-item" data-page="tecnicos">Técnicos</button>
+        <button class="nav-item" data-page="configuracoes">Configurações</button>
       </nav>
       <div class="sidebar-footer">
         <small id="user-email"></small>
@@ -56,9 +58,20 @@
           <article><span>Orçamentos abertos</span><strong id="stat-orcamentos">0</strong></article>
           <article><span>OS em aberto</span><strong id="stat-os">0</strong></article>
         </div>
-        <div class="panel">
-          <h3>Fluxo da V2</h3>
-          <p class="muted">Cadastre serviços, monte orçamentos e converta-os em ordens de serviço. Ao concluir uma OS, os materiais utilizados são baixados automaticamente do estoque.</p>
+        <div class="dashboard-grid">
+          <div class="panel">
+            <h3>Resumo financeiro</h3>
+            <div class="mini-stats">
+              <div><span>Receitas recebidas</span><b id="dash-recebido">R$ 0,00</b></div>
+              <div><span>A receber</span><b id="dash-receber">R$ 0,00</b></div>
+              <div><span>Despesas pagas</span><b id="dash-despesas">R$ 0,00</b></div>
+              <div><span>Resultado realizado</span><b id="dash-resultado">R$ 0,00</b></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h3>Ordens de Serviço recentes</h3>
+            <div id="dash-os-recentes" class="compact-list"></div>
+          </div>
         </div>
       </section>
 
@@ -93,7 +106,7 @@
       </section>
 
       <section id="page-os" class="page hidden">
-        <div class="toolbar"><input id="os-search" placeholder="Pesquisar OS ou cliente..."><button id="nova-os" class="btn primary">+ Ordem de Serviço</button></div>
+        <div class="toolbar"><input id="os-search" placeholder="Pesquisar OS ou cliente..."><select id="os-status-filter"><option value="">Todos os status</option><option value="aberta">Aberta</option><option value="em_andamento">Em andamento</option><option value="aguardando_material">Aguardando material</option><option value="concluida">Concluída</option><option value="cancelada">Cancelada</option></select><button id="nova-os" class="btn primary">+ Ordem de Serviço</button></div>
         <div class="table-wrap"><table><thead><tr><th>Nº</th><th>Cliente</th><th>Abertura</th><th>Responsável</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody id="os-table"></tbody></table></div>
       </section>
 
@@ -109,7 +122,33 @@
           <article><span>Vencido</span><strong id="fin-vencido">R$ 0,00</strong></article>
         </div>
         <div class="toolbar"><input id="financeiro-search" placeholder="Pesquisar lançamento, cliente ou status..."><button id="novo-lancamento" class="btn primary">+ Lançamento</button></div>
-        <div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Cliente</th><th>Vencimento</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="financeiro-table"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Cliente</th><th>Vencimento</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th></tr></thead><tbody id="financeiro-table"></tbody></table></div>
+      </section>
+      <section id="page-tecnicos" class="page hidden">
+        <div class="toolbar"><input id="tecnico-search" placeholder="Pesquisar técnico..."><button id="novo-tecnico" class="btn primary">+ Técnico</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Telefone</th><th>E-mail</th><th>Status</th><th></th></tr></thead><tbody id="tecnicos-table"></tbody></table></div>
+      </section>
+
+      <section id="page-configuracoes" class="page hidden">
+        <div class="panel config-panel">
+          <h3>Dados da empresa</h3>
+          <p class="muted">Esses dados serão usados nos documentos de orçamento e ordem de serviço.</p>
+          <form id="empresa-form">
+            <div class="form-grid">
+              <label>Nome fantasia<input id="emp-nome"></label>
+              <label>Razão social<input id="emp-razao"></label>
+              <label>CNPJ<input id="emp-cnpj"></label>
+              <label>Telefone<input id="emp-telefone"></label>
+              <label>E-mail<input id="emp-email" type="email"></label>
+              <label>CEP<input id="emp-cep"></label>
+              <label class="span-2">Endereço<input id="emp-endereco"></label>
+              <label>Cidade<input id="emp-cidade"></label>
+              <label>UF<input id="emp-uf" maxlength="2"></label>
+              <label class="span-2">Rodapé dos documentos<textarea id="emp-rodape" rows="3"></textarea></label>
+            </div>
+            <div class="modal-actions"><button class="btn primary">Salvar configurações</button></div>
+          </form>
+        </div>
       </section>
     </main>
   </div>

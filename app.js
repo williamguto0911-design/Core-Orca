@@ -2,7 +2,7 @@ const SUPABASE_URL = "https://vihhktumvtfdcnthekic.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhrdHVtdnRmZGNudGhla2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjY5NTksImV4cCI6MjEwNTE0Mjk1OX0.F6dsoPwigniSvr6CwA8S91tr7KAH-utME0uAwr4etpo";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], currentPage="dashboard";
+let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], empresa=null, currentPage="dashboard";
 let editorItens=[];
 
 const $=id=>document.getElementById(id);
@@ -20,7 +20,7 @@ async function init(){
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
 async function showApp(session){$("login-screen").classList.add("hidden");$("app").classList.remove("hidden");$("user-email").textContent=session.user.email||"";await refreshAll()}
 async function refreshAll(){
-  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro()]);
+  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadEmpresa()]);
   renderDashboard(); renderCurrent();
 }
 function renderCurrent(){
@@ -32,6 +32,8 @@ function renderCurrent(){
   if(currentPage==="os")renderOS();
   if(currentPage==="agenda")renderAgenda();
   if(currentPage==="financeiro")renderFinanceiro();
+  if(currentPage==="tecnicos")renderTecnicos();
+  if(currentPage==="configuracoes")renderEmpresa();
 }
 async function loadClientes(){const {data,error}=await sb.from("clientes").select("*").eq("ativo",true).order("nome");if(error)return toast("Clientes: "+error.message);clientes=data||[]}
 async function loadMateriais(){const {data,error}=await sb.from("materiais").select("*").eq("ativo",true).order("nome");if(error)return toast("Materiais: "+error.message);materiais=data||[]}
@@ -41,6 +43,9 @@ async function loadOrdens(){const {data,error}=await sb.from("ordens_servico").s
 
 async function loadAgenda(){const {data,error}=await sb.from("agenda").select("*,clientes(nome),ordens_servico(numero)").order("inicio",{ascending:true});if(error){agenda=[];return}agenda=data||[]}
 async function loadFinanceiro(){const {data,error}=await sb.from("financeiro").select("*,clientes(nome),ordens_servico(numero)").order("vencimento",{ascending:true});if(error){financeiro=[];return}financeiro=data||[]}
+async function loadTecnicos(){const {data,error}=await sb.from("tecnicos").select("*").order("nome");if(error){tecnicos=[];return}tecnicos=data||[]}
+async function loadEmpresa(){const {data,error}=await sb.from("empresa_config").select("*").limit(1).maybeSingle();if(error){empresa=null;return}empresa=data||null}
+
 
 
 function renderDashboard(){
@@ -50,11 +55,16 @@ function renderDashboard(){
   $("stat-valor").textContent=money(materiais.reduce((s,m)=>s+Number(m.estoque_atual)*Number(m.custo),0));
   $("stat-orcamentos").textContent=orcamentos.filter(o=>!["aprovado","reprovado","cancelado"].includes(o.status)).length;
   $("stat-os").textContent=ordens.filter(o=>!["concluida","cancelada"].includes(o.status)).length;
+  const recebido=financeiro.filter(f=>f.tipo!=="despesa"&&f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
+  const receber=financeiro.filter(f=>f.tipo!=="despesa"&&f.status==="pendente").reduce((s,f)=>s+Number(f.valor),0);
+  const despesas=financeiro.filter(f=>f.tipo==="despesa"&&f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
+  $("dash-recebido").textContent=money(recebido);$("dash-receber").textContent=money(receber);$("dash-despesas").textContent=money(despesas);$("dash-resultado").textContent=money(recebido-despesas);
+  $("dash-os-recentes").innerHTML=ordens.slice(0,6).map(o=>`<div class="compact-item"><span><b>${esc(o.numero)}</b><br><small>${esc(o.clientes?.nome||"-")}</small></span><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></div>`).join("")||'<span class="muted">Nenhuma OS.</span>';
 }
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 function renderClientes(){
@@ -78,7 +88,7 @@ function renderOrcamentos(){
  $("orcamentos-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOrcamento('${o.id}')">Abrir</button><button class="action-btn" onclick="convertOrcamento('${o.id}')">Gerar OS</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum orçamento encontrado.</td></tr>`;
 }
 function renderOS(){
- const q=$("os-search").value.toLowerCase();const rows=ordens.filter(o=>[o.numero,o.clientes?.nome,o.responsavel,o.status].some(v=>String(v||"").toLowerCase().includes(q)));
+ const q=$("os-search").value.toLowerCase(), sf=$("os-status-filter").value;const rows=ordens.filter(o=>(!sf||o.status===sf)&&[o.numero,o.clientes?.nome,o.responsavel,o.status].some(v=>String(v||"").toLowerCase().includes(q)));
  $("os-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_abertura+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${esc(o.responsavel||"-")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOS('${o.id}')">Abrir</button>${o.status!=="concluida"&&o.status!=="cancelada"?`<button class="action-btn" onclick="concluirOS('${o.id}')">Concluir</button>`:""}</div></td></tr>`).join("")||`<tr><td colspan="7">Nenhuma OS encontrada.</td></tr>`;
 }
 
@@ -90,24 +100,53 @@ function renderAgenda(){
 }
 function renderFinanceiro(){
  const q=$("financeiro-search").value.toLowerCase(), now=new Date().toISOString().slice(0,10);
- const rows=financeiro.filter(f=>[f.descricao,f.status,f.clientes?.nome,f.ordens_servico?.numero].some(v=>String(v||"").toLowerCase().includes(q)));
- $("financeiro-table").innerHTML=rows.map(f=>`<tr><td><b>${esc(f.descricao)}</b><br><span class="muted">${esc(f.ordens_servico?.numero||"")}</span></td><td>${esc(f.clientes?.nome||"-")}</td><td>${f.vencimento?new Date(f.vencimento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${money(f.valor)}</td><td><span class="badge ${esc(f.status)}">${statusLabel(f.status)}</span></td><td><div class="actions">${f.status!=="pago"?`<button class="action-btn" onclick="markPaid('${f.id}')">Receber</button>`:""}<button class="action-btn" onclick="deleteFinance('${f.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum lançamento.</td></tr>`;
- const receber=financeiro.filter(f=>f.status!=="pago").reduce((s,f)=>s+Number(f.valor),0);
- const recebido=financeiro.filter(f=>f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
- const vencido=financeiro.filter(f=>f.status!=="pago"&&f.vencimento&&f.vencimento<now).reduce((s,f)=>s+Number(f.valor),0);
+ const rows=financeiro.filter(f=>[f.tipo,f.descricao,f.status,f.forma_pagamento,f.clientes?.nome,f.ordens_servico?.numero].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("financeiro-table").innerHTML=rows.map(f=>`<tr><td class="${f.tipo==="despesa"?"type-despesa":"type-receita"}">${statusLabel(f.tipo||"receita")}</td><td><b>${esc(f.descricao)}</b><br><span class="muted">${esc(f.ordens_servico?.numero||"")}</span></td><td>${esc(f.clientes?.nome||"-")}</td><td>${f.vencimento?new Date(f.vencimento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${money(f.valor)}</td><td>${esc(statusLabel(f.forma_pagamento||"-"))}</td><td><span class="badge ${esc(f.status)}">${statusLabel(f.status)}</span></td><td><div class="actions">${f.status!=="pago"?`<button class="action-btn" onclick="markPaid('${f.id}')">Baixar</button>`:""}<button class="action-btn" onclick="deleteFinance('${f.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="8">Nenhum lançamento.</td></tr>`;
+ const receber=financeiro.filter(f=>f.tipo!=="despesa"&&f.status!=="pago"&&f.status!=="cancelado").reduce((s,f)=>s+Number(f.valor),0);
+ const recebido=financeiro.filter(f=>f.tipo!=="despesa"&&f.status==="pago").reduce((s,f)=>s+Number(f.valor),0);
+ const vencido=financeiro.filter(f=>f.tipo!=="despesa"&&f.status!=="pago"&&f.status!=="cancelado"&&f.vencimento&&f.vencimento<now).reduce((s,f)=>s+Number(f.valor),0);
  $("fin-receber").textContent=money(receber);$("fin-recebido").textContent=money(recebido);$("fin-vencido").textContent=money(vencido);
 }
 function agendaForm(){
- openModal("Novo agendamento",`<form id="entity-form"><div class="form-grid"><label>Título*<input id="f-titulo" required></label><label>Cliente<select id="f-cliente"><option value="">Sem cliente</option>${clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></label><label>OS<select id="f-os"><option value="">Sem OS</option>${ordens.map(o=>`<option value="${o.id}">${esc(o.numero)} — ${esc(o.clientes?.nome||"")}</option>`).join("")}</select></label><label>Responsável<input id="f-responsavel"></label><label>Início*<input id="f-inicio" type="datetime-local" required></label><label>Fim<input id="f-fim" type="datetime-local"></label><label>Status<select id="f-status"><option value="agendado">Agendado</option><option value="confirmado">Confirmado</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option></select></label><label class="span-2">Observações<textarea id="f-obs"></textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ openModal("Novo agendamento",`<form id="entity-form"><div class="form-grid"><label>Título*<input id="f-titulo" required></label><label>Cliente<select id="f-cliente"><option value="">Sem cliente</option>${clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></label><label>OS<select id="f-os"><option value="">Sem OS</option>${ordens.map(o=>`<option value="${o.id}">${esc(o.numero)} — ${esc(o.clientes?.nome||"")}</option>`).join("")}</select></label><label>Responsável<select id="f-responsavel"><option value="">Selecione...</option>${tecnicos.filter(t=>t.ativo).map(t=>`<option value="${esc(t.nome)}">${esc(t.nome)}</option>`).join("")}</select></label><label>Início*<input id="f-inicio" type="datetime-local" required></label><label>Fim<input id="f-fim" type="datetime-local"></label><label>Status<select id="f-status"><option value="agendado">Agendado</option><option value="confirmado">Confirmado</option><option value="concluido">Concluído</option><option value="cancelado">Cancelado</option></select></label><label class="span-2">Observações<textarea id="f-obs"></textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
  $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={titulo:$("f-titulo").value.trim(),cliente_id:$("f-cliente").value||null,ordem_servico_id:$("f-os").value||null,responsavel:$("f-responsavel").value.trim(),inicio:new Date($("f-inicio").value).toISOString(),fim:$("f-fim").value?new Date($("f-fim").value).toISOString():null,status:$("f-status").value,observacoes:$("f-obs").value.trim()};const {error}=await sb.from("agenda").insert(obj);if(error)return toast(error.message);closeModal();await loadAgenda();renderAgenda();toast("Agendamento criado")};
 }
 async function deleteAgenda(id){if(!confirm("Excluir agendamento?"))return;const {error}=await sb.from("agenda").delete().eq("id",id);if(error)return toast(error.message);await loadAgenda();renderAgenda()}
 function financeiroForm(){
- openModal("Novo lançamento",`<form id="entity-form"><div class="form-grid"><label>Descrição*<input id="f-descricao" required></label><label>Cliente<select id="f-cliente"><option value="">Sem cliente</option>${clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></label><label>OS<select id="f-os"><option value="">Sem OS</option>${ordens.map(o=>`<option value="${o.id}">${esc(o.numero)}</option>`).join("")}</select></label><label>Valor*<input id="f-valor" type="number" min="0" step="0.01" required></label><label>Vencimento<input id="f-vencimento" type="date"></label><label>Status<select id="f-status"><option value="pendente">Pendente</option><option value="pago">Pago</option><option value="cancelado">Cancelado</option></select></label><label class="span-2">Observações<textarea id="f-obs"></textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async e=>{e.preventDefault();const status=$("f-status").value,obj={descricao:$("f-descricao").value.trim(),cliente_id:$("f-cliente").value||null,ordem_servico_id:$("f-os").value||null,valor:Number($("f-valor").value),vencimento:$("f-vencimento").value||null,status,data_pagamento:status==="pago"?new Date().toISOString():null,observacoes:$("f-obs").value.trim()};const {error}=await sb.from("financeiro").insert(obj);if(error)return toast(error.message);closeModal();await loadFinanceiro();renderFinanceiro();toast("Lançamento criado")};
+ openModal("Novo lançamento",`<form id="entity-form"><div class="form-grid"><label>Tipo<select id="f-tipo"><option value="receita">Receita</option><option value="despesa">Despesa</option></select></label><label>Descrição*<input id="f-descricao" required></label><label>Cliente<select id="f-cliente"><option value="">Sem cliente</option>${clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></label><label>OS<select id="f-os"><option value="">Sem OS</option>${ordens.map(o=>`<option value="${o.id}">${esc(o.numero)}</option>`).join("")}</select></label><label>Valor*<input id="f-valor" type="number" min="0" step="0.01" required></label><label>Vencimento<input id="f-vencimento" type="date"></label><label>Forma de pagamento<select id="f-pagamento"><option value="">Não definida</option><option value="pix">PIX</option><option value="dinheiro">Dinheiro</option><option value="cartao_credito">Cartão de crédito</option><option value="cartao_debito">Cartão de débito</option><option value="boleto">Boleto</option><option value="transferencia">Transferência</option></select></label><label>Status<select id="f-status"><option value="pendente">Pendente</option><option value="pago">Pago</option><option value="cancelado">Cancelado</option></select></label><label class="span-2">Observações<textarea id="f-obs"></textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const status=$("f-status").value,obj={tipo:$("f-tipo").value,descricao:$("f-descricao").value.trim(),cliente_id:$("f-cliente").value||null,ordem_servico_id:$("f-os").value||null,valor:Number($("f-valor").value),vencimento:$("f-vencimento").value||null,forma_pagamento:$("f-pagamento").value||null,status,data_pagamento:status==="pago"?new Date().toISOString():null,observacoes:$("f-obs").value.trim()};const {error}=await sb.from("financeiro").insert(obj);if(error)return toast(error.message);closeModal();await loadFinanceiro();renderFinanceiro();renderDashboard();toast("Lançamento criado")};
 }
 async function markPaid(id){const {error}=await sb.from("financeiro").update({status:"pago",data_pagamento:new Date().toISOString()}).eq("id",id);if(error)return toast(error.message);await loadFinanceiro();renderFinanceiro()}
 async function deleteFinance(id){if(!confirm("Excluir lançamento?"))return;const {error}=await sb.from("financeiro").delete().eq("id",id);if(error)return toast(error.message);await loadFinanceiro();renderFinanceiro()}
+
+
+function renderTecnicos(){
+ const q=$("tecnico-search").value.toLowerCase(), rows=tecnicos.filter(t=>[t.nome,t.funcao,t.telefone,t.email].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("tecnicos-table").innerHTML=rows.map(t=>`<tr><td><b>${esc(t.nome)}</b></td><td>${esc(t.funcao||"-")}</td><td>${esc(t.telefone||"-")}</td><td>${esc(t.email||"-")}</td><td>${t.ativo?"Ativo":"Inativo"}</td><td><div class="actions"><button class="action-btn" onclick="editTecnico('${t.id}')">Editar</button><button class="action-btn" onclick="toggleTecnico('${t.id}',${!t.ativo})">${t.ativo?"Inativar":"Ativar"}</button></div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum técnico.</td></tr>';
+}
+function tecnicoForm(t={}){
+ openModal(t.id?"Editar técnico":"Novo técnico",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(t.nome)}"></label><label>Função<input id="f-funcao" value="${esc(t.funcao)}"></label><label>Telefone<input id="f-telefone" value="${esc(t.telefone)}"></label><label>E-mail<input id="f-email" type="email" value="${esc(t.email)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(t.observacoes)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),funcao:$("f-funcao").value.trim(),telefone:$("f-telefone").value.trim(),email:$("f-email").value.trim(),observacoes:$("f-obs").value.trim()};const r=t.id?await sb.from("tecnicos").update(obj).eq("id",t.id):await sb.from("tecnicos").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadTecnicos();renderTecnicos();toast("Técnico salvo")};
+}
+function editTecnico(id){const t=tecnicos.find(x=>x.id===id);if(t)tecnicoForm(t)}
+async function toggleTecnico(id,ativo){const {error}=await sb.from("tecnicos").update({ativo}).eq("id",id);if(error)return toast(error.message);await loadTecnicos();renderTecnicos()}
+
+function renderEmpresa(){
+ if(!$("empresa-form"))return;const e=empresa||{};
+ $("emp-nome").value=e.nome_fantasia||"";$("emp-razao").value=e.razao_social||"";$("emp-cnpj").value=e.cnpj||"";$("emp-telefone").value=e.telefone||"";$("emp-email").value=e.email||"";$("emp-cep").value=e.cep||"";$("emp-endereco").value=e.endereco||"";$("emp-cidade").value=e.cidade||"";$("emp-uf").value=e.uf||"";$("emp-rodape").value=e.rodape_documentos||"";
+}
+async function saveEmpresa(e){
+ e.preventDefault();const obj={nome_fantasia:$("emp-nome").value.trim(),razao_social:$("emp-razao").value.trim(),cnpj:$("emp-cnpj").value.trim(),telefone:$("emp-telefone").value.trim(),email:$("emp-email").value.trim(),cep:$("emp-cep").value.trim(),endereco:$("emp-endereco").value.trim(),cidade:$("emp-cidade").value.trim(),uf:$("emp-uf").value.trim().toUpperCase(),rodape_documentos:$("emp-rodape").value.trim()};
+ let r;if(empresa?.id)r=await sb.from("empresa_config").update(obj).eq("id",empresa.id);else r=await sb.from("empresa_config").insert(obj);
+ if(r.error)return toast(r.error.message);await loadEmpresa();renderEmpresa();toast("Configurações salvas");
+}
+async function addOSTimeline(osId,tipo,descricao){
+ const {error}=await sb.from("os_historico").insert({ordem_servico_id:osId,tipo,descricao});if(error)console.warn(error.message);
+}
+async function loadOSTimeline(osId){const {data}=await sb.from("os_historico").select("*").eq("ordem_servico_id",osId).order("created_at",{ascending:false});return data||[]}
+function companyHeader(){
+ const e=empresa||{};return `<h1>${esc(e.nome_fantasia||"Core-Orca")}</h1>${e.razao_social?`<p>${esc(e.razao_social)}</p>`:""}${e.cnpj?`<p>CNPJ: ${esc(e.cnpj)}</p>`:""}<p>${esc([e.telefone,e.email].filter(Boolean).join(" | "))}</p><p>${esc([e.endereco,e.cidade,e.uf].filter(Boolean).join(" - "))}</p>`;
+}
 
 async function uploadOSPhoto(osId,file,tipo){
  if(!file)return;
@@ -116,7 +155,7 @@ async function uploadOSPhoto(osId,file,tipo){
  if(up.error)return toast("Foto: "+up.error.message);
  const {error}=await sb.from("os_fotos").insert({ordem_servico_id:osId,storage_path:path,tipo,descricao:file.name});
  if(error)return toast(error.message);
- toast("Foto enviada");await viewOS(osId);
+ await addOSTimeline(osId,"foto","Foto adicionada à OS.");toast("Foto enviada");await viewOS(osId);
 }
 async function deleteOSPhoto(id,path,osId){
  if(!confirm("Excluir esta foto?"))return;
@@ -126,12 +165,12 @@ async function openSignature(osId){
  openModal("Assinatura do cliente",`<label>Nome do cliente<input id="sig-name"></label><div class="signature-wrap"><canvas id="signature-canvas" width="850" height="190"></canvas></div><div class="modal-actions"><button type="button" id="sig-clear" class="btn secondary">Limpar</button><button type="button" class="btn secondary" onclick="viewOS('${osId}')">Cancelar</button><button type="button" id="sig-save" class="btn primary">Salvar assinatura</button></div>`);
  const pad=new SignaturePad($("signature-canvas"),{minWidth:1,maxWidth:2.5});
  $("sig-clear").onclick=()=>pad.clear();
- $("sig-save").onclick=async()=>{if(pad.isEmpty())return toast("Faça a assinatura.");const {error}=await sb.from("ordens_servico").update({assinatura_nome:$("sig-name").value.trim(),assinatura_data_url:pad.toDataURL("image/png"),assinatura_em:new Date().toISOString()}).eq("id",osId);if(error)return toast(error.message);toast("Assinatura salva");await loadOrdens();await viewOS(osId)};
+ $("sig-save").onclick=async()=>{if(pad.isEmpty())return toast("Faça a assinatura.");const {error}=await sb.from("ordens_servico").update({assinatura_nome:$("sig-name").value.trim(),assinatura_data_url:pad.toDataURL("image/png"),assinatura_em:new Date().toISOString()}).eq("id",osId);if(error)return toast(error.message);await addOSTimeline(osId,"assinatura","Assinatura do cliente registrada.");toast("Assinatura salva");await loadOrdens();await viewOS(osId)};
 }
 function printDocument(title,header,items,notes){
  const w=window.open("","_blank");if(!w)return toast("Permita pop-ups para gerar o PDF.");
  const rows=items.map(i=>`<tr><td>${esc(statusLabel(i.tipo))}</td><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("");
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h1{margin-bottom:4px}p{margin:5px 0}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:12px}th{background:#f3f4f6}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:18px}.muted{color:#666}</style></head><body><h1>Core-Orca</h1><h2>${esc(title)}</h2>${header}<table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>${notes||""}<script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h1{margin-bottom:4px}p{margin:5px 0}table{width:100%;border-collapse:collapse;margin-top:18px}th,td{border-bottom:1px solid #ddd;padding:8px;text-align:left;font-size:12px}th{background:#f3f4f6}.total{text-align:right;font-size:18px;font-weight:bold;margin-top:18px}.muted{color:#666}</style></head><body>${companyHeader()}<h2>${esc(title)}</h2>${header}<table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>${notes||""}<p class="muted">${esc(empresa?.rodape_documentos||"")}</p><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
 }
 async function printOrcamento(id){
  const o=orcamentos.find(x=>x.id===id);const {data,error}=await sb.from("orcamento_itens").select("*").eq("orcamento_id",id).order("ordem");if(error)return toast(error.message);
@@ -233,14 +272,17 @@ function osForm(){
 }
 async function viewOS(id){
  const o=ordens.find(x=>x.id===id);
- const [{data:itens,error},{data:fotos,error:fotoError}]=await Promise.all([
+ const [{data:itens,error},{data:fotos,error:fotoError},historico]=await Promise.all([
    sb.from("ordem_servico_itens").select("*").eq("ordem_servico_id",id).order("ordem"),
-   sb.from("os_fotos").select("*").eq("ordem_servico_id",id).order("created_at",{ascending:false})
+   sb.from("os_fotos").select("*").eq("ordem_servico_id",id).order("created_at",{ascending:false}),
+   loadOSTimeline(id)
  ]);
  if(error)return toast(error.message);if(fotoError)return toast(fotoError.message);
+ const custoMateriais=(itens||[]).filter(i=>i.tipo==="material").reduce((s,i)=>{const m=materiais.find(x=>x.id===i.material_id);return s+Number(i.quantidade)*Number(m?.custo||0)},0);const lucro=Number(o.total)-custoMateriais;
+ const timelineHTML=(historico||[]).map(h=>`<div class="timeline-item"><b>${esc(statusLabel(h.tipo))}</b><br>${esc(h.descricao)}<br><small>${new Date(h.created_at).toLocaleString("pt-BR")}</small></div>`).join("")||'<span class="muted">Sem histórico registrado.</span>';
  const photoCards=(fotos||[]).map(f=>{const {data:u}=sb.storage.from("os-fotos").getPublicUrl(f.storage_path);return `<div class="photo-card"><img src="${u.publicUrl}" alt="Foto da OS"><div>${esc(statusLabel(f.tipo))}<br><button class="action-btn" onclick="deleteOSPhoto('${f.id}','${f.storage_path}','${id}')">Excluir</button></div></div>`}).join("");
  openModal("Ordem de Serviço "+o.numero,`<div class="form-grid"><p><b>Cliente:</b> ${esc(o.clientes?.nome)}</p><p><b>Status:</b> ${statusLabel(o.status)}</p><p><b>Responsável:</b> ${esc(o.responsavel||"-")}</p><p><b>Total:</b> ${money(o.total)}</p><p class="span-2"><b>Local:</b> ${esc(o.local_servico||"-")}</p><p class="span-2"><b>Solicitação:</b> ${esc(o.descricao_problema||"-")}</p></div><div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${(itens||[]).map(i=>`<tr><td>${statusLabel(i.tipo)}</td><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("")||`<tr><td colspan="5">Sem itens.</td></tr>`}</tbody></table></div>
- <h4 class="section-title">Fotos</h4><div class="form-grid"><label>Tipo<select id="photo-type"><option value="antes">Antes</option><option value="durante">Durante</option><option value="depois">Depois</option></select></label><label>Adicionar foto<input id="photo-file" type="file" accept="image/*" capture="environment"></label></div><div class="photo-grid">${photoCards||'<span class="muted">Nenhuma foto.</span>'}</div>
+ <div class="profit-box"><div><small>Valor da OS</small><br><b>${money(o.total)}</b></div><div><small>Custo de materiais</small><br><b>${money(custoMateriais)}</b></div><div><small>Margem bruta estimada</small><br><b>${money(lucro)}</b></div></div><h4 class="section-title">Histórico</h4><div class="timeline">${timelineHTML}</div><h4 class="section-title">Fotos</h4><div class="form-grid"><label>Tipo<select id="photo-type"><option value="antes">Antes</option><option value="durante">Durante</option><option value="depois">Depois</option></select></label><label>Adicionar foto<input id="photo-file" type="file" accept="image/*" capture="environment"></label></div><div class="photo-grid">${photoCards||'<span class="muted">Nenhuma foto.</span>'}</div>
  <h4 class="section-title">Assinatura</h4><p>${o.assinatura_nome?`Assinado por <b>${esc(o.assinatura_nome)}</b> em ${new Date(o.assinatura_em).toLocaleString("pt-BR")}`:"Ainda não assinada."}</p>
  ${o.status!=="concluida"&&o.status!=="cancelada"?`<div class="warning">Ao concluir, os materiais desta OS serão baixados automaticamente do estoque.</div>`:""}
  <div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn secondary" onclick="printOS('${o.id}')">PDF / Imprimir</button><button class="btn secondary" onclick="openSignature('${o.id}')">Assinatura</button>${o.status!=="concluida"&&o.status!=="cancelada"?`<button class="btn success" onclick="concluirOS('${o.id}')">Concluir OS</button>`:""}</div>`);
@@ -249,7 +291,7 @@ async function viewOS(id){
 async function concluirOS(id){
  if(!confirm("Concluir esta OS e baixar os materiais do estoque?"))return;
  const {data,error}=await sb.rpc("concluir_ordem_servico",{p_ordem_id:id});if(error)return toast("Não foi possível concluir: "+error.message);
- closeModal();await Promise.all([loadMateriais(),loadOrdens(),loadFinanceiro()]);renderOS();renderDashboard();toast(data||"OS concluída.");
+ await addOSTimeline(id,"conclusao","Ordem de Serviço concluída.");closeModal();await Promise.all([loadMateriais(),loadOrdens(),loadFinanceiro()]);renderOS();renderDashboard();toast(data||"OS concluída.");
 }
 
 async function importCSV(file){
@@ -271,9 +313,9 @@ $("logout-btn").onclick=async()=>{await sb.auth.signOut();showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;
-$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;
+$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
-$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;
+$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
 init();

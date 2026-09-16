@@ -25,20 +25,23 @@
       <div class="brand"><span>⚡</span><div><b>Core-Orca</b><small>Manutenção Elétrica</small></div></div>
       <nav>
         <button class="nav-item active" data-page="dashboard">Dashboard</button>
-        <button class="nav-item" data-page="clientes">Clientes</button>
-        <button class="nav-item" data-page="materiais">Materiais</button>
-        <button class="nav-item" data-page="servicos">Serviços</button>
-        <button class="nav-item" data-page="estoque">Estoque</button>
-        <button class="nav-item" data-page="orcamentos">Orçamentos</button>
-        <button class="nav-item" data-page="os">Ordens de Serviço</button>
-        <button class="nav-item" data-page="agenda">Agenda</button>
-        <button class="nav-item" data-page="financeiro">Financeiro</button>
-        <button class="nav-item" data-page="tecnicos">Técnicos</button>
-        <button class="nav-item" data-page="fornecedores">Fornecedores</button>
-        <button class="nav-item" data-page="compras">Compras</button>
-        <button class="nav-item" data-page="relatorios">Relatórios</button>
-        <button class="nav-item admin-only" data-page="usuarios">Usuários</button>
-        <button class="nav-item" data-page="configuracoes">Configurações</button>
+        <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
+        <button class="nav-item" data-page="materiais" data-module="materiais">Materiais</button>
+        <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
+        <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
+        <button class="nav-item" data-page="orcamentos" data-module="orcamentos">Orçamentos</button>
+        <button class="nav-item" data-page="os" data-module="os">Ordens de Serviço</button>
+        <button class="nav-item" data-page="agenda" data-module="agenda">Agenda</button>
+        <button class="nav-item" data-page="financeiro" data-module="financeiro">Financeiro</button>
+        <button class="nav-item" data-page="recibos" data-module="recibos">Recibos</button>
+        <button class="nav-item" data-page="tecnicos" data-module="tecnicos">Técnicos</button>
+        <button class="nav-item" data-page="fornecedores" data-module="fornecedores">Fornecedores</button>
+        <button class="nav-item" data-page="compras" data-module="compras">Compras</button>
+        <button class="nav-item" data-page="relatorios" data-module="relatorios">Relatórios</button>
+        <button class="nav-item manager-only" data-page="usuarios">Usuários</button>
+        <button class="nav-item manager-only" data-page="cargos">Cargos e Permissões</button>
+        <button class="nav-item platform-only hidden" data-page="admin-plataforma">Administração SaaS</button>
+        <button class="nav-item" data-page="configuracoes" data-module="configuracoes">Configurações</button>
       </nav>
       <div class="sidebar-footer">
         <small id="user-email"></small>
@@ -95,7 +98,7 @@
           <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
           <button id="novo-material" class="btn primary">+ Material</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>UN</th><th>Estoque</th><th>Custo</th><th>Venda</th><th></th></tr></thead><tbody id="materiais-table"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>UN</th><th>Estoque</th><th>Custo</th><th>Venda</th><th>Lucro</th><th>Margem</th><th></th></tr></thead><tbody id="materiais-table"></tbody></table></div>
       </section>
 
       <section id="page-servicos" class="page hidden">
@@ -132,6 +135,11 @@
         <div class="toolbar"><input id="financeiro-search" placeholder="Pesquisar lançamento, cliente ou status..."><button id="novo-lancamento" class="btn primary">+ Lançamento</button></div>
         <div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Cliente</th><th>Vencimento</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th></tr></thead><tbody id="financeiro-table"></tbody></table></div>
       </section>
+      <section id="page-recibos" class="page hidden">
+        <div class="toolbar"><input id="recibo-search" placeholder="Pesquisar recibo ou cliente..."><button id="novo-recibo" class="btn primary">+ Recibo</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Nº</th><th>Cliente</th><th>Emissão</th><th>Total</th><th>Pago</th><th>Status</th><th></th></tr></thead><tbody id="recibos-table"></tbody></table></div>
+      </section>
+
       <section id="page-tecnicos" class="page hidden">
         <div class="toolbar"><input id="tecnico-search" placeholder="Pesquisar técnico..."><button id="novo-tecnico" class="btn primary">+ Técnico</button></div>
         <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Função</th><th>Telefone</th><th>E-mail</th><th>Status</th><th></th></tr></thead><tbody id="tecnicos-table"></tbody></table></div>
@@ -171,12 +179,33 @@
         </div>
       </section>
 
+      <section id="page-cargos" class="page hidden manager-only">
+        <div class="panel">
+          <h3>Cargos e permissões</h3>
+          <p class="muted">Gerente possui acesso total à empresa. Para colaboradores, crie cargos e marque exatamente os módulos liberados.</p>
+          <div class="toolbar"><input id="cargo-search" placeholder="Pesquisar cargo..."><button id="novo-cargo" class="btn primary">+ Cargo</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Cargo</th><th>Descrição</th><th>Permissões</th><th></th></tr></thead><tbody id="cargos-table"></tbody></table></div>
+        </div>
+      </section>
+
+      <section id="page-admin-plataforma" class="page hidden platform-only">
+        <div class="panel">
+          <div class="panel-head"><div><h3>Administração da plataforma</h3><p class="muted">Gestão de empresas e licenças. Este perfil não possui acesso aos dados operacionais das empresas.</p></div><button id="nova-empresa-saas" class="btn primary">+ Empresa</button></div>
+          <div class="stats">
+            <article><span>Empresas</span><strong id="saas-empresas">0</strong></article>
+            <article><span>Licenças contratadas</span><strong id="saas-licencas">0</strong></article>
+            <article><span>Usuários ativos</span><strong id="saas-usuarios">0</strong></article>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Documento</th><th>Status</th><th>Licenças</th><th>Em uso</th><th>Validade</th><th></th></tr></thead><tbody id="saas-table"></tbody></table></div>
+        </div>
+      </section>
+
       <section id="page-usuarios" class="page hidden admin-only">
         <div class="panel">
           <h3>Perfis e permissões</h3>
-          <p class="muted">Associe o e-mail de login a um perfil. O usuário precisa existir no Supabase Auth para conseguir entrar.</p>
+          <p class="muted">Cadastre os usuários da empresa. O Gerente pode liberar acesso por cargo. O login precisa existir no Supabase Auth.</p>
           <div class="toolbar"><input id="usuario-search" placeholder="Pesquisar usuário..."><button id="novo-usuario" class="btn primary">+ Perfil de usuário</button></div>
-          <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th></th></tr></thead><tbody id="usuarios-table"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Tipo</th><th>Cargo</th><th>Status</th><th></th></tr></thead><tbody id="usuarios-table"></tbody></table></div>
         </div>
       </section>
 

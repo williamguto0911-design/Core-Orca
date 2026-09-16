@@ -2,7 +2,7 @@ const SUPABASE_URL = "https://vihhktumvtfdcnthekic.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhrdHVtdnRmZGNudGhla2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjY5NTksImV4cCI6MjEwNTE0Mjk1OX0.F6dsoPwigniSvr6CwA8S91tr7KAH-utME0uAwr4etpo";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], fornecedores=[], compras=[], usuarios=[], empresa=null, currentUserProfile=null, currentPage="dashboard";
+let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], fornecedores=[], compras=[], usuarios=[], recibos=[], cargos=[], empresasSaas=[], empresa=null, currentUserProfile=null, currentSession=null, currentPage="dashboard";
 let editorItens=[];
 
 const $=id=>document.getElementById(id);
@@ -18,10 +18,18 @@ async function init(){
   sb.auth.onAuthStateChange(async(event,session)=>{if(session)await showApp(session);else showLogin()});
 }
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
-async function showApp(session){$("login-screen").classList.add("hidden");$("app").classList.remove("hidden");$("user-email").textContent=session.user.email||"";await refreshAll()}
+async function showApp(session){currentSession=session;$("login-screen").classList.add("hidden");$("app").classList.remove("hidden");$("user-email").textContent=session.user.email||"";await refreshAll()}
 async function refreshAll(){
-  await loadCurrentProfile(session.user); await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa()]); applyPermissions();
-  renderDashboard(); renderCurrent();
+  if(!currentSession)return;
+  await loadCurrentProfile(currentSession.user);
+  if(currentUserProfile?.is_platform_admin){
+    await loadSaasAdmin();
+    applyPermissions();
+    navigate("admin-plataforma");
+    return;
+  }
+  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa(),loadRecibos(),loadCargos()]);
+  applyPermissions();renderDashboard();renderCurrent();
 }
 function renderCurrent(){
   if(currentPage==="clientes")renderClientes();
@@ -38,6 +46,9 @@ function renderCurrent(){
   if(currentPage==="compras")renderCompras();
   if(currentPage==="usuarios")renderUsuarios();
   if(currentPage==="relatorios")renderRelatorios();
+  if(currentPage==="recibos")renderRecibos();
+  if(currentPage==="cargos")renderCargos();
+  if(currentPage==="admin-plataforma")renderSaasAdmin();
 }
 async function loadClientes(){const {data,error}=await sb.from("clientes").select("*").eq("ativo",true).order("nome");if(error)return toast("Clientes: "+error.message);clientes=data||[]}
 async function loadMateriais(){const {data,error}=await sb.from("materiais").select("*").eq("ativo",true).order("nome");if(error)return toast("Materiais: "+error.message);materiais=data||[]}
@@ -50,15 +61,32 @@ async function loadFinanceiro(){const {data,error}=await sb.from("financeiro").s
 async function loadTecnicos(){const {data,error}=await sb.from("tecnicos").select("*").order("nome");if(error){tecnicos=[];return}tecnicos=data||[]}
 async function loadEmpresa(){const {data,error}=await sb.from("empresa_config").select("*").limit(1).maybeSingle();if(error){empresa=null;return}empresa=data||null}
 
-async function loadCurrentProfile(user){const {data}=await sb.from("usuarios_perfis").select("*").eq("email",user.email).eq("ativo",true).maybeSingle();currentUserProfile=data||{email:user.email,nome:user.email,perfil:"admin",ativo:true}}
+async function loadCurrentProfile(user){
+ const {data,error}=await sb.rpc("core_orca_context");
+ if(error){currentUserProfile={email:user.email,is_platform_admin:false,tipo:"colaborador",permissions:{}};return}
+ currentUserProfile=data||{email:user.email,is_platform_admin:false,tipo:"colaborador",permissions:{}};
+}
 async function loadFornecedores(){const {data,error}=await sb.from("fornecedores").select("*").eq("ativo",true).order("nome");if(error){fornecedores=[];return}fornecedores=data||[]}
 async function loadCompras(){const {data,error}=await sb.from("compras").select("*,fornecedores(nome)").order("created_at",{ascending:false});if(error){compras=[];return}compras=data||[]}
-async function loadUsuarios(){const {data,error}=await sb.from("usuarios_perfis").select("*").order("nome");if(error){usuarios=[];return}usuarios=data||[]}
+async function loadUsuarios(){const {data,error}=await sb.from("empresa_usuarios").select("*,cargos(nome)").order("nome");if(error){usuarios=[];return}usuarios=data||[]}
+async function loadRecibos(){const {data,error}=await sb.from("recibos").select("*,clientes(nome)").order("created_at",{ascending:false});if(error){recibos=[];return}recibos=data||[]}
+async function loadCargos(){const {data,error}=await sb.from("cargos").select("*").order("nome");if(error){cargos=[];return}cargos=data||[]}
+async function loadSaasAdmin(){const {data,error}=await sb.rpc("admin_list_empresas");if(error){empresasSaas=[];return}empresasSaas=data||[]}
+function can(module,action="read"){
+ if(currentUserProfile?.is_platform_admin)return false;
+ if(currentUserProfile?.tipo==="gerente")return true;
+ const p=currentUserProfile?.permissions||{};
+ return p[module]===true || p[module]?.[action]===true || p[module]?.all===true;
+}
 function applyPermissions(){
- const role=currentUserProfile?.perfil||"tecnico";
- document.querySelectorAll(".admin-only").forEach(el=>el.classList.toggle("restricted",role!=="admin"));
- if(role==="tecnico"){
-   document.querySelectorAll('[data-page="financeiro"],[data-page="configuracoes"],[data-page="usuarios"],[data-page="compras"],[data-page="fornecedores"]').forEach(el=>el.classList.add("hidden"));
+ const platform=!!currentUserProfile?.is_platform_admin, manager=currentUserProfile?.tipo==="gerente";
+ document.querySelectorAll(".platform-only").forEach(el=>el.classList.toggle("hidden",!platform));
+ document.querySelectorAll(".manager-only").forEach(el=>el.classList.toggle("hidden",platform||!manager));
+ document.querySelectorAll("[data-module]").forEach(el=>el.classList.toggle("hidden",platform||!can(el.dataset.module,"read")));
+ if(platform){
+   document.querySelectorAll(".nav-item:not(.platform-only)").forEach(el=>el.classList.add("hidden"));
+ } else {
+   document.querySelectorAll(".nav-item:not(.platform-only)").forEach(el=>{if(!el.dataset.module&&!el.classList.contains("manager-only"))el.classList.remove("hidden")});
  }
 }
 
@@ -82,7 +110,7 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Administração SaaS",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 function renderClientes(){
@@ -91,7 +119,7 @@ function renderClientes(){
 }
 function renderMateriais(){
  const q=$("material-search").value.toLowerCase();const rows=materiais.filter(m=>[m.codigo,m.nome,m.categoria,m.fabricante].some(v=>String(v||"").toLowerCase().includes(q)));
- $("materiais-table").innerHTML=rows.map(m=>`<tr><td>${esc(m.codigo||"-")}</td><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.fabricante||"")}</span></td><td>${esc(m.categoria||"-")}</td><td>${esc(m.unidade)}</td><td class="${Number(m.estoque_atual)<=Number(m.estoque_minimo)?"low":"ok"}">${Number(m.estoque_atual).toLocaleString("pt-BR")}</td><td>${money(m.custo)}</td><td>${money(m.preco_venda)}</td><td><div class="actions"><button class="action-btn" onclick="editMaterial('${m.id}')">Editar</button><button class="action-btn" onclick="deleteMaterial('${m.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="8">Nenhum material encontrado.</td></tr>`;
+ $("materiais-table").innerHTML=rows.map(m=>`<tr><td>${esc(m.codigo||"-")}</td><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.fabricante||"")}</span></td><td>${esc(m.categoria||"-")}</td><td>${esc(m.unidade)}</td><td class="${Number(m.estoque_atual)<=Number(m.estoque_minimo)?"low":"ok"}">${Number(m.estoque_atual).toLocaleString("pt-BR")}</td><td>${money(m.custo)}</td><td>${money(m.preco_venda)}</td><td>${money(m.lucro_valor??(Number(m.preco_venda)-Number(m.custo)))}</td><td>${Number(m.lucro_percentual??(Number(m.custo)>0?((Number(m.preco_venda)-Number(m.custo))/Number(m.custo)*100):0)).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td><td><div class="actions"><button class="action-btn" onclick="editMaterial('${m.id}')">Editar</button><button class="action-btn" onclick="deleteMaterial('${m.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="10">Nenhum material encontrado.</td></tr>`;
 }
 function renderServicos(){
  const q=$("servico-search").value.toLowerCase();const rows=servicos.filter(s=>[s.codigo,s.nome,s.categoria,s.descricao].some(v=>String(v||"").toLowerCase().includes(q)));
@@ -188,6 +216,36 @@ function exportMateriais(){
  downloadCSV(`materiais_${today()}.csv`,["Código","Nome","Categoria","Unidade","Estoque atual","Estoque mínimo","Custo","Preço venda"],materiais.map(m=>[m.codigo||"",m.nome,m.categoria||"",m.unidade||"",m.estoque_atual,m.estoque_minimo,Number(m.custo).toFixed(2),Number(m.preco_venda).toFixed(2)]));
 }
 
+
+function renderRecibos(){
+ const q=$("recibo-search").value.toLowerCase(),rows=recibos.filter(r=>[r.numero,r.status,r.clientes?.nome].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("recibos-table").innerHTML=rows.map(r=>`<tr><td><b>${esc(r.numero)}</b></td><td>${esc(r.clientes?.nome||"-")}</td><td>${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(r.total)}</td><td>${money(r.valor_pago||0)}</td><td><span class="badge">${statusLabel(r.status)}</span></td><td><div class="actions"><button class="action-btn" onclick="viewRecibo('${r.id}')">Abrir</button><button class="action-btn" onclick="printRecibo('${r.id}')">PDF / Imprimir</button></div></td></tr>`).join("")||'<tr><td colspan="7">Nenhum recibo.</td></tr>';
+}
+function reciboForm(){
+ editorItens=[];let pagamentos=[{data:today(),valor:0}];
+ openModal("Novo recibo",`<form id="entity-form"><div class="form-grid"><label>Cliente*<select id="f-cliente" required><option value="">Selecione...</option>${clientes.map(c=>`<option value="${c.id}">${esc(c.nome)}</option>`).join("")}</select></label><label>Emissão<input id="f-data" type="date" value="${today()}"></label><label class="span-2">Referente a / observações<textarea id="f-obs"></textarea></label></div>${itemEditorHTML()}<div class="item-builder"><div class="panel-head"><b>Pagamentos / parcelamento</b><button type="button" id="add-payment" class="btn secondary">+ Parcela</button></div><div id="payments-box"></div><div class="form-grid"><label>Nº parcelas automáticas<input id="auto-n" type="number" min="1" value="1"></label><label>Intervalo<select id="auto-int"><option value="30">Mensal (30 dias)</option><option value="15">15 dias</option><option value="7">Semanal</option></select></label></div><button type="button" id="auto-split" class="btn secondary">Gerar parcelamento pelo total</button></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar recibo</button></div></form>`);
+ setupItemEditor();
+ const draw=()=>{const b=$("payments-box");b.innerHTML=pagamentos.map((p,n)=>`<div class="payment-row"><label>Data<input data-pn="${n}" data-pk="data" type="date" value="${p.data||""}"></label><label>Valor<input data-pn="${n}" data-pk="valor" type="number" min="0" step="0.01" value="${p.valor||0}"></label><label>Status<select data-pn="${n}" data-pk="status"><option value="previsto" ${p.status!=="pago"?"selected":""}>Previsto</option><option value="pago" ${p.status==="pago"?"selected":""}>Pago</option></select></label><button type="button" class="action-btn" data-prm="${n}">Remover</button></div>`).join("");b.querySelectorAll("[data-pn]").forEach(i=>i.onchange=()=>pagamentos[Number(i.dataset.pn)][i.dataset.pk]=i.dataset.pk==="valor"?Number(i.value):i.value);b.querySelectorAll("[data-prm]").forEach(x=>x.onclick=()=>{pagamentos.splice(Number(x.dataset.prm),1);draw()})};
+ $("add-payment").onclick=()=>{pagamentos.push({data:today(),valor:0,status:"previsto"});draw()};
+ $("auto-split").onclick=()=>{const total=editorItens.reduce((s,i)=>s+i.quantidade*i.valor_unitario,0),n=Math.max(1,Number($("auto-n").value)||1),days=Number($("auto-int").value)||30,base=new Date($("f-data").value+"T12:00:00"),each=Math.floor(total*100/n)/100;pagamentos=[];let used=0;for(let i=0;i<n;i++){const d=new Date(base);d.setDate(d.getDate()+days*i);const val=i===n-1?Math.round((total-used)*100)/100:each;used+=val;pagamentos.push({data:d.toISOString().slice(0,10),valor:val,status:"previsto"})}draw()};draw();
+ $("entity-form").onsubmit=async e=>{e.preventDefault();if(!editorItens.length)return toast("Adicione ao menos um item.");const total=editorItens.reduce((s,i)=>s+i.quantidade*i.valor_unitario,0);const soma=pagamentos.reduce((s,p)=>s+Number(p.valor||0),0);if(Math.abs(soma-total)>0.02)return toast("A soma das parcelas deve ser igual ao total do recibo.");const {data,error}=await sb.from("recibos").insert({cliente_id:$("f-cliente").value,data_emissao:$("f-data").value,observacoes:$("f-obs").value.trim(),total,status:pagamentos.every(p=>p.status==="pago")?"pago":"aberto"}).select().single();if(error)return toast(error.message);let r=await sb.from("recibo_itens").insert(editorItens.map((i,n)=>({recibo_id:data.id,tipo:i.tipo,material_id:i.tipo==="material"?i.referencia_id:null,servico_id:i.tipo==="servico"?i.referencia_id:null,descricao:i.descricao,quantidade:i.quantidade,valor_unitario:i.valor_unitario,ordem:n})));if(r.error)return toast(r.error.message);r=await sb.from("recibo_pagamentos").insert(pagamentos.map((p,n)=>({recibo_id:data.id,parcela:n+1,data_pagamento:p.data,valor:p.valor,status:p.status})));if(r.error)return toast(r.error.message);closeModal();await loadRecibos();renderRecibos();toast("Recibo criado: "+data.numero)};
+}
+async function viewRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);openModal("Recibo "+r.numero,`<p><b>Cliente:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Total:</b> ${money(r.total)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor</th></tr></thead><tbody>${(itens||[]).map(i=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("")}</tbody></table></div><h4>Pagamentos</h4><div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn primary" onclick="printRecibo('${id}')">PDF / Imprimir</button></div>`)}
+async function printRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const pay=`<h3>Pagamentos</h3><table><thead><tr><th>Parcela</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`<p><b>Recebemos de:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Emissão:</b> ${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
+
+const permissionModules=["clientes","materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes"];
+function renderCargos(){const q=$("cargo-search").value.toLowerCase(),rows=cargos.filter(c=>[c.nome,c.descricao].some(v=>String(v||"").toLowerCase().includes(q)));$("cargos-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.descricao||"-")}</td><td>${Object.keys(c.permissoes||{}).filter(k=>c.permissoes[k]?.read||c.permissoes[k]===true).map(statusLabel).join(", ")||"Sem acesso"}</td><td><button class="action-btn" onclick="cargoForm(cargos.find(x=>x.id==='${c.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="4">Nenhum cargo personalizado.</td></tr>'}
+function cargoForm(c={}){
+ const p=c.permissoes||{};openModal(c.id?"Editar cargo":"Novo cargo",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(c.nome)}"></label><label>Descrição<input id="f-desc" value="${esc(c.descricao)}"></label></div><div class="permission-grid">${permissionModules.map(m=>`<div class="permission-card"><b>${statusLabel(m)}</b><label><input type="checkbox" data-pm="${m}" data-pa="read" ${p[m]?.read||p[m]===true?"checked":""}> Visualizar</label><label><input type="checkbox" data-pm="${m}" data-pa="write" ${p[m]?.write?"checked":""}> Criar/editar</label><label><input type="checkbox" data-pm="${m}" data-pa="delete" ${p[m]?.delete?"checked":""}> Excluir</label></div>`).join("")}</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const perms={};document.querySelectorAll("[data-pm]").forEach(x=>{perms[x.dataset.pm]??={};perms[x.dataset.pm][x.dataset.pa]=x.checked});const obj={nome:$("f-nome").value.trim(),descricao:$("f-desc").value.trim(),permissoes:perms};const r=c.id?await sb.from("cargos").update(obj).eq("id",c.id):await sb.from("cargos").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadCargos();renderCargos();toast("Cargo salvo")};
+}
+
+function renderSaasAdmin(){if(!currentUserProfile?.is_platform_admin)return;const total=empresasSaas.reduce((s,e)=>s+Number(e.licencas_max||0),0),used=empresasSaas.reduce((s,e)=>s+Number(e.licencas_usadas||0),0);$("saas-empresas").textContent=empresasSaas.length;$("saas-licencas").textContent=total;$("saas-usuarios").textContent=used;$("saas-table").innerHTML=empresasSaas.map(e=>`<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.documento||"-")}</td><td class="${e.ativa?"license-ok":"license-blocked"}">${e.ativa?"Ativa":"Bloqueada"}</td><td>${e.licencas_max}</td><td>${e.licencas_usadas}</td><td>${e.licenca_validade?new Date(e.licenca_validade+"T12:00:00").toLocaleDateString("pt-BR"):"Sem limite"}</td><td><button class="action-btn" onclick="empresaSaasForm(empresasSaas.find(x=>x.id==='${e.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="7">Nenhuma empresa.</td></tr>'}
+function empresaSaasForm(e={}){
+ openModal(e.id?"Editar empresa/licença":"Nova empresa",`<form id="entity-form"><div class="form-grid"><label>Empresa*<input id="f-nome" required value="${esc(e.nome)}"></label><label>CNPJ/Documento<input id="f-doc" value="${esc(e.documento)}"></label><label>Licenças<input id="f-lic" type="number" min="1" value="${e.licencas_max||1}"></label><label>Validade<input id="f-validade" type="date" value="${e.licenca_validade||""}"></label><label>Status<select id="f-ativa"><option value="true" ${e.ativa!==false?"selected":""}>Ativa</option><option value="false" ${e.ativa===false?"selected":""}>Bloqueada</option></select></label><label>E-mail do gerente inicial<input id="f-gerente" type="email" placeholder="Opcional"></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async ev=>{ev.preventDefault();const payload={p_id:e.id||null,p_nome:$("f-nome").value.trim(),p_documento:$("f-doc").value.trim()||null,p_licencas:Number($("f-lic").value)||1,p_validade:$("f-validade").value||null,p_ativa:$("f-ativa").value==="true",p_gerente_email:$("f-gerente").value.trim().toLowerCase()||null};const {error}=await sb.rpc("admin_upsert_empresa",payload);if(error)return toast(error.message);closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Empresa/licença salva")};
+}
+
 function renderFornecedores(){
  const q=$("fornecedor-search").value.toLowerCase(), rows=fornecedores.filter(f=>[f.nome,f.documento,f.telefone,f.email,f.cidade].some(v=>String(v||"").toLowerCase().includes(q)));
  $("fornecedores-table").innerHTML=rows.map(f=>`<tr><td><b>${esc(f.nome)}</b><br><span class="muted">${esc(f.email||"")}</span></td><td>${esc(f.documento||"-")}</td><td>${esc(f.telefone||"-")}</td><td>${esc([f.cidade,f.uf].filter(Boolean).join("/")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editFornecedor('${f.id}')">Editar</button><button class="action-btn" onclick="deleteFornecedor('${f.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="5">Nenhum fornecedor.</td></tr>';
@@ -214,12 +272,12 @@ async function viewCompra(id){const c=compras.find(x=>x.id===id);const {data,err
 async function confirmCompra(id){if(!confirm("Confirmar compra? Isso dará entrada no estoque e criará a conta a pagar."))return;const {data,error}=await sb.rpc("confirmar_compra",{p_compra_id:id});if(error)return toast(error.message);await Promise.all([loadCompras(),loadMateriais(),loadFinanceiro()]);renderCompras();renderDashboard();toast(data)}
 
 function renderUsuarios(){
- const q=$("usuario-search").value.toLowerCase(), rows=usuarios.filter(u=>[u.nome,u.email,u.perfil].some(v=>String(v||"").toLowerCase().includes(q)));
- $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td><span class="badge role-${esc(u.perfil)}">${statusLabel(u.perfil)}</span></td><td>${u.ativo?"Ativo":"Inativo"}</td><td><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button></td></tr>`).join("")||'<tr><td colspan="5">Nenhum perfil.</td></tr>';
+ const q=$("usuario-search").value.toLowerCase(), rows=usuarios.filter(u=>[u.nome,u.email,u.tipo,u.cargos?.nome].some(v=>String(v||"").toLowerCase().includes(q)));
+ $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
 }
 function usuarioForm(u={}){
- openModal(u.id?"Editar perfil":"Novo perfil de usuário",`<form id="entity-form"><div class="form-grid"><label>Nome<input id="f-nome" value="${esc(u.nome)}"></label><label>E-mail de login*<input id="f-email" type="email" required value="${esc(u.email)}"></label><label>Perfil<select id="f-perfil"><option value="admin" ${u.perfil==="admin"?"selected":""}>Administrador</option><option value="escritorio" ${u.perfil==="escritorio"?"selected":""}>Escritório</option><option value="tecnico" ${u.perfil==="tecnico"?"selected":""}>Técnico</option></select></label><label>Ativo<select id="f-ativo"><option value="true">Sim</option><option value="false" ${u.ativo===false?"selected":""}>Não</option></select></label></div><p class="permission-note">Este cadastro define permissões do Core-Orca; a conta de autenticação deve existir no Supabase Auth.</p><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),email:$("f-email").value.trim().toLowerCase(),perfil:$("f-perfil").value,ativo:$("f-ativo").value==="true"};const r=u.id?await sb.from("usuarios_perfis").update(obj).eq("id",u.id):await sb.from("usuarios_perfis").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadUsuarios();renderUsuarios();toast("Perfil salvo")};
+ openModal(u.id?"Editar usuário":"Novo usuário da empresa",`<form id="entity-form"><div class="form-grid"><label>Nome<input id="f-nome" value="${esc(u.nome)}"></label><label>E-mail de login*<input id="f-email" type="email" required value="${esc(u.email)}"></label><label>Tipo<select id="f-tipo"><option value="colaborador" ${u.tipo!=="gerente"?"selected":""}>Colaborador</option><option value="gerente" ${u.tipo==="gerente"?"selected":""}>Gerente</option></select></label><label>Cargo do colaborador<select id="f-cargo"><option value="">Sem cargo</option>${cargos.map(c=>`<option value="${c.id}" ${u.cargo_id===c.id?"selected":""}>${esc(c.nome)}</option>`).join("")}</select></label><label>Ativo<select id="f-ativo"><option value="true">Sim</option><option value="false" ${u.ativo===false?"selected":""}>Não</option></select></label></div><div class="warning">A quantidade de usuários ativos não pode ultrapassar as licenças contratadas pela empresa.</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const {error}=await sb.rpc("gerente_upsert_usuario",{p_id:u.id||null,p_nome:$("f-nome").value.trim(),p_email:$("f-email").value.trim().toLowerCase(),p_tipo:$("f-tipo").value,p_cargo_id:$("f-tipo").value==="colaborador"?($("f-cargo").value||null):null,p_ativo:$("f-ativo").value==="true"});if(error)return toast(error.message);closeModal();await loadUsuarios();renderUsuarios();toast("Usuário salvo")};
 }
 function editUsuario(id){const u=usuarios.find(x=>x.id===id);if(u)usuarioForm(u)}
 
@@ -307,6 +365,8 @@ function openModal(title,body){$("modal-title").textContent=title;$("modal-body"
 function closeModal(){$("modal").classList.add("hidden");editorItens=[]}
 
 function clienteForm(c={}){
+ let contatos=Array.isArray(c.contatos_json)?c.contatos_json:[];
+ const contactsHTML=()=>contatos.map((x,n)=>`<div class="contact-row"><input data-cn="${n}" data-k="nome" placeholder="Nome" value="${esc(x.nome)}"><input data-cn="${n}" data-k="telefone" placeholder="Telefone" value="${esc(x.telefone)}"><input data-cn="${n}" data-k="email" placeholder="E-mail" value="${esc(x.email)}"><button type="button" class="action-btn" data-crm="${n}">Remover</button></div>`).join("");
  openModal(c.id?"Editar cliente":"Novo cliente",`<form id="entity-form"><div class="form-grid">
  <label>Tipo<select id="f-tipo"><option ${c.tipo_pessoa==="PF"?"selected":""}>PF</option><option ${c.tipo_pessoa==="PJ"?"selected":""}>PJ</option></select></label>
  <label>Nome / Razão social*<input id="f-nome" required value="${esc(c.nome)}"></label><label>CPF / CNPJ<input id="f-documento" value="${esc(c.documento)}"></label>
@@ -315,29 +375,49 @@ function clienteForm(c={}){
  <label>CEP<input id="f-cep" value="${esc(c.cep)}"></label><label>Endereço<input id="f-endereco" value="${esc(c.endereco)}"></label>
  <label>Número<input id="f-numero" value="${esc(c.numero)}"></label><label>Complemento<input id="f-complemento" value="${esc(c.complemento)}"></label>
  <label>Bairro<input id="f-bairro" value="${esc(c.bairro)}"></label><label>Cidade<input id="f-cidade" value="${esc(c.cidade)}"></label>
- <label>Estado<input id="f-estado" maxlength="2" value="${esc(c.estado)}"></label><label class="span-2">Observações<textarea id="f-obs">${esc(c.observacoes)}</textarea></label>
- </div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={tipo_pessoa:$("f-tipo").value,nome:$("f-nome").value.trim(),documento:$("f-documento").value.trim(),telefone:$("f-telefone").value.trim(),celular:$("f-celular").value.trim(),email:$("f-email").value.trim(),email_cobranca:$("f-cobranca").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-endereco").value.trim(),numero:$("f-numero").value.trim(),complemento:$("f-complemento").value.trim(),bairro:$("f-bairro").value.trim(),cidade:$("f-cidade").value.trim(),estado:$("f-estado").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim()};const res=c.id?await sb.from("clientes").update(obj).eq("id",c.id):await sb.from("clientes").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();toast("Cliente salvo");await loadClientes();renderClientes();renderDashboard()};
+ <label>Estado<input id="f-estado" maxlength="2" value="${esc(c.estado)}"></label>
+ </div>
+ <div id="pj-fields" class="pj-fields ${c.tipo_pessoa==="PJ"?"":"hidden"}"><b>Representante legal e contatos da empresa</b><div class="form-grid">
+ <label>Representante legal<input id="f-rep-nome" value="${esc(c.representante_legal_nome)}"></label><label>CPF do representante<input id="f-rep-cpf" value="${esc(c.representante_legal_cpf)}"></label>
+ <label>Cargo / função<input id="f-rep-cargo" value="${esc(c.representante_legal_cargo)}"></label><label>E-mail<input id="f-rep-email" type="email" value="${esc(c.representante_legal_email)}"></label>
+ <label>Telefone<input id="f-rep-tel" value="${esc(c.representante_legal_telefone)}"></label></div>
+ <div id="contacts-box">${contactsHTML()}</div><button type="button" id="add-contact" class="btn secondary">+ Contato</button></div>
+ <label class="span-2">Observações<textarea id="f-obs">${esc(c.observacoes)}</textarea></label>
+ <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ const drawContacts=()=>{const box=$("contacts-box");box.innerHTML=contactsHTML();box.querySelectorAll("[data-cn]").forEach(i=>i.oninput=()=>contatos[Number(i.dataset.cn)][i.dataset.k]=i.value);box.querySelectorAll("[data-crm]").forEach(b=>b.onclick=()=>{contatos.splice(Number(b.dataset.crm),1);drawContacts()})};
+ $("f-tipo").onchange=()=>$("pj-fields").classList.toggle("hidden",$("f-tipo").value!=="PJ");
+ $("add-contact").onclick=()=>{contatos.push({nome:"",telefone:"",email:""});drawContacts()};
+ drawContacts();
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const pj=$("f-tipo").value==="PJ";const obj={tipo_pessoa:$("f-tipo").value,nome:$("f-nome").value.trim(),documento:$("f-documento").value.trim(),telefone:$("f-telefone").value.trim(),celular:$("f-celular").value.trim(),email:$("f-email").value.trim(),email_cobranca:$("f-cobranca").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-endereco").value.trim(),numero:$("f-numero").value.trim(),complemento:$("f-complemento").value.trim(),bairro:$("f-bairro").value.trim(),cidade:$("f-cidade").value.trim(),estado:$("f-estado").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim(),representante_legal_nome:pj?$("f-rep-nome").value.trim():null,representante_legal_cpf:pj?$("f-rep-cpf").value.trim():null,representante_legal_cargo:pj?$("f-rep-cargo").value.trim():null,representante_legal_email:pj?$("f-rep-email").value.trim():null,representante_legal_telefone:pj?$("f-rep-tel").value.trim():null,contatos_json:pj?contatos.filter(x=>x.nome||x.telefone||x.email):[]};const res=c.id?await sb.from("clientes").update(obj).eq("id",c.id):await sb.from("clientes").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();toast("Cliente salvo");await loadClientes();renderClientes();renderDashboard()};
 }
 function editCliente(id){const c=clientes.find(x=>x.id===id);if(c)clienteForm(c)}
 async function deleteCliente(id){if(!confirm("Excluir este cliente?"))return;const {error}=await sb.from("clientes").update({ativo:false}).eq("id",id);if(error)return toast("Erro: "+error.message);await loadClientes();renderClientes();renderDashboard()}
 
 function materialForm(m={}){
  openModal(m.id?"Editar material":"Novo material",`<form id="entity-form"><div class="form-grid">
- <label>Código<input id="f-codigo" value="${esc(m.codigo)}"></label><label>Nome*<input id="f-nome" required value="${esc(m.nome)}"></label>
+ <label>Código<input id="f-codigo" value="${esc(m.codigo||"Gerado automaticamente")}" disabled></label><label>Nome*<input id="f-nome" required value="${esc(m.nome)}"></label>
  <label>Descrição<input id="f-descricao" value="${esc(m.descricao)}"></label><label>Categoria<input id="f-categoria" value="${esc(m.categoria)}"></label>
  <label>Fabricante<input id="f-fabricante" value="${esc(m.fabricante)}"></label><label>Unidade<input id="f-unidade" value="${esc(m.unidade||"UN")}"></label>
  <label>Estoque atual<input id="f-estoque" type="number" step="0.001" value="${m.estoque_atual??0}"></label><label>Estoque mínimo<input id="f-minimo" type="number" step="0.001" value="${m.estoque_minimo??0}"></label>
- <label>Custo<input id="f-custo" type="number" step="0.01" value="${m.custo??0}"></label><label>Preço de venda<input id="f-preco" type="number" step="0.01" value="${m.preco_venda??0}"></label>
+ <label>Custo<input id="f-custo" type="number" min="0" step="0.01" value="${m.custo??0}"></label><label>Preço de venda<input id="f-preco" type="number" min="0" step="0.01" value="${m.preco_venda??0}"></label>
+ <label>Lucro em R$<input id="f-lucro" disabled></label><label>Lucro sobre custo (%)<input id="f-margem" disabled></label>
  </div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={codigo:$("f-codigo").value.trim()||null,nome:$("f-nome").value.trim(),descricao:$("f-descricao").value.trim(),categoria:$("f-categoria").value.trim(),fabricante:$("f-fabricante").value.trim(),unidade:$("f-unidade").value.trim()||"UN",estoque_atual:Number($("f-estoque").value)||0,estoque_minimo:Number($("f-minimo").value)||0,custo:Number($("f-custo").value)||0,preco_venda:Number($("f-preco").value)||0};const res=m.id?await sb.from("materiais").update(obj).eq("id",m.id):await sb.from("materiais").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();await loadMateriais();renderMateriais();renderDashboard();toast("Material salvo")};
+ const calc=()=>{const c=Number($("f-custo").value)||0,p=Number($("f-preco").value)||0;$("f-lucro").value=money(p-c);$("f-margem").value=(c>0?((p-c)/c*100):0).toLocaleString("pt-BR",{maximumFractionDigits:2})+"%"};
+ $("f-custo").oninput=calc;$("f-preco").oninput=calc;calc();
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={nome:$("f-nome").value.trim(),descricao:$("f-descricao").value.trim(),categoria:$("f-categoria").value.trim(),fabricante:$("f-fabricante").value.trim(),unidade:$("f-unidade").value.trim()||"UN",estoque_atual:Number($("f-estoque").value)||0,estoque_minimo:Number($("f-minimo").value)||0,custo:Number($("f-custo").value)||0,preco_venda:Number($("f-preco").value)||0};const res=m.id?await sb.from("materiais").update(obj).eq("id",m.id):await sb.from("materiais").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();await loadMateriais();renderMateriais();renderDashboard();toast("Material salvo")};
 }
 function editMaterial(id){const m=materiais.find(x=>x.id===id);if(m)materialForm(m)}
 async function deleteMaterial(id){if(!confirm("Excluir este material?"))return;const {error}=await sb.from("materiais").update({ativo:false}).eq("id",id);if(error)return toast("Erro: "+error.message);await loadMateriais();renderMateriais();renderDashboard()}
 
-function servicoForm(s={}){
- openModal(s.id?"Editar serviço":"Novo serviço",`<form id="entity-form"><div class="form-grid"><label>Código<input id="f-codigo" value="${esc(s.codigo)}"></label><label>Nome*<input id="f-nome" required value="${esc(s.nome)}"></label><label>Categoria<input id="f-categoria" value="${esc(s.categoria)}"></label><label>Unidade<input id="f-unidade" value="${esc(s.unidade||"SV")}"></label><label>Valor<input id="f-valor" type="number" min="0" step="0.01" value="${s.valor??0}"></label><label class="span-2">Descrição<textarea id="f-descricao">${esc(s.descricao)}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={codigo:$("f-codigo").value.trim()||null,nome:$("f-nome").value.trim(),categoria:$("f-categoria").value.trim(),unidade:$("f-unidade").value.trim()||"SV",valor:Number($("f-valor").value)||0,descricao:$("f-descricao").value.trim()};const res=s.id?await sb.from("servicos").update(obj).eq("id",s.id):await sb.from("servicos").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();await loadServicos();renderServicos();toast("Serviço salvo")};
+async function servicoForm(s={}){
+ let vinculados=[];
+ if(s.id){const {data}=await sb.from("servico_materiais").select("*").eq("servico_id",s.id);vinculados=(data||[]).map(x=>({material_id:x.material_id,quantidade:Number(x.quantidade)}))}
+ const draw=()=>{const tb=$("service-materials");if(!tb)return;tb.innerHTML=vinculados.map((x,n)=>{const m=materiais.find(a=>a.id===x.material_id);return `<tr><td>${esc(m?.codigo||"")} ${esc(m?.nome||"Material")}</td><td>${x.quantidade}</td><td><button type="button" class="action-btn" data-srm="${n}">Remover</button></td></tr>`}).join("")||'<tr><td colspan="3">Nenhum material vinculado.</td></tr>';tb.querySelectorAll("[data-srm]").forEach(b=>b.onclick=()=>{vinculados.splice(Number(b.dataset.srm),1);draw()})};
+ openModal(s.id?"Editar serviço":"Novo serviço",`<form id="entity-form"><div class="form-grid"><label>Código<input id="f-codigo" value="${esc(s.codigo)}"></label><label>Nome*<input id="f-nome" required value="${esc(s.nome)}"></label><label>Categoria<input id="f-categoria" value="${esc(s.categoria)}"></label><label>Unidade<input id="f-unidade" value="${esc(s.unidade||"SV")}"></label><label>Valor<input id="f-valor" type="number" min="0" step="0.01" value="${s.valor??0}"></label><label class="span-2">Descrição<textarea id="f-descricao">${esc(s.descricao)}</textarea></label></div>
+ <div class="item-builder"><b>Materiais vinculados ao serviço</b><div class="form-grid"><label>Material<select id="sm-material"><option value="">Selecione...</option>${materiais.map(m=>`<option value="${m.id}">${esc(m.codigo||"")} ${esc(m.nome)}</option>`).join("")}</select></label><label>Quantidade<input id="sm-qtd" type="number" min="0.001" step="0.001" value="1"></label></div><button type="button" id="sm-add" class="btn secondary">+ Vincular material</button><div class="items-table"><table><thead><tr><th>Material</th><th>Qtd.</th><th></th></tr></thead><tbody id="service-materials"></tbody></table></div></div>
+ <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
+ $("sm-add").onclick=()=>{const id=$("sm-material").value,q=Number($("sm-qtd").value);if(!id||q<=0)return toast("Selecione material e quantidade.");const ex=vinculados.find(x=>x.material_id===id);if(ex)ex.quantidade+=q;else vinculados.push({material_id:id,quantidade:q});draw()};draw();
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={codigo:$("f-codigo").value.trim()||null,nome:$("f-nome").value.trim(),categoria:$("f-categoria").value.trim(),unidade:$("f-unidade").value.trim()||"SV",valor:Number($("f-valor").value)||0,descricao:$("f-descricao").value.trim()};let id=s.id;let res;if(id)res=await sb.from("servicos").update(obj).eq("id",id);else{res=await sb.from("servicos").insert(obj).select().single();id=res.data?.id}if(res.error)return toast("Erro: "+res.error.message);await sb.from("servico_materiais").delete().eq("servico_id",id);if(vinculados.length){const r=await sb.from("servico_materiais").insert(vinculados.map(x=>({servico_id:id,material_id:x.material_id,quantidade:x.quantidade})));if(r.error)return toast("Serviço salvo, mas erro nos materiais: "+r.error.message)}closeModal();await loadServicos();renderServicos();toast("Serviço salvo")};
 }
 function editServico(id){const s=servicos.find(x=>x.id===id);if(s)servicoForm(s)}
 async function deleteServico(id){if(!confirm("Excluir este serviço?"))return;const {error}=await sb.from("servicos").update({ativo:false}).eq("id",id);if(error)return toast("Erro: "+error.message);await loadServicos();renderServicos()}
@@ -362,7 +442,7 @@ function setupItemEditor(){
   suggestions.querySelectorAll("[data-id]").forEach(el=>el.onclick=()=>{const x=source.find(y=>y.id===el.dataset.id);$("item-id").value=x.id;search.value=`${x.codigo?x.codigo+" - ":""}${x.nome}`;$("item-valor").value=tipo==="material"?Number(x.preco_venda||0):Number(x.valor||0);suggestions.classList.add("hidden")});
  }
  search.oninput=suggest;$("item-tipo").onchange=()=>{search.value="";clearSelection();suggestions.classList.add("hidden")};
- $("add-item").onclick=()=>{const tipo=$("item-tipo").value,id=$("item-id").value,qtd=Number($("item-qtd").value),valor=Number($("item-valor").value);if(!id||qtd<=0)return toast("Selecione um item pela pesquisa.");const source=tipo==="material"?materiais:servicos;const x=source.find(y=>y.id===id);editorItens.push({tipo,referencia_id:id,descricao:x.nome,quantidade:qtd,valor_unitario:valor});search.value="";$("item-id").value="";$("item-valor").value="";$("item-qtd").value=1;renderEditorItens()};
+ $("add-item").onclick=async()=>{const tipo=$("item-tipo").value,id=$("item-id").value,qtd=Number($("item-qtd").value),valor=Number($("item-valor").value);if(!id||qtd<=0)return toast("Selecione um item pela lista de resultados.");const source=tipo==="material"?materiais:servicos;const x=source.find(y=>y.id===id);if(!x)return toast("Item não encontrado.");editorItens.push({tipo,referencia_id:id,descricao:x.nome,quantidade:qtd,valor_unitario:valor});if(tipo==="servico"){const {data,error}=await sb.from("servico_materiais").select("*").eq("servico_id",id);if(!error)(data||[]).forEach(sm=>{const m=materiais.find(mm=>mm.id===sm.material_id);if(m)editorItens.push({tipo:"material",referencia_id:m.id,descricao:`${m.nome} (material do serviço ${x.nome})`,quantidade:Number(sm.quantidade)*qtd,valor_unitario:Number(m.preco_venda||0),origem_servico_id:id})})}search.value="";$("item-id").value="";$("item-valor").value="";$("item-qtd").value=1;suggestions.classList.add("hidden");renderEditorItens()};
  renderEditorItens();
 }
 function renderEditorItens(){
@@ -434,10 +514,10 @@ $("login-form").onsubmit=async e=>{e.preventDefault();$("login-error").textConte
 $("logout-btn").onclick=async()=>{await sb.auth.signOut();showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
-$("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;
+$("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();
 $("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
-$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
+$("recibo-search").oninput=renderRecibos;$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
 init();

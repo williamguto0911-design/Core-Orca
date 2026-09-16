@@ -1,46 +1,63 @@
-# Core-Orca V6
+# Core-Orca V7 — Multiempresa / SaaS
 
-## Foco da V6
-Esta versão prioriza gestão, relatórios, exportação e segurança.
+A V7 altera a arquitetura do Core-Orca para permitir venda de licenças e isolamento real entre empresas.
 
-### Novidades
-- Relatórios gerenciais por período.
-- Receitas recebidas, despesas pagas e resultado.
-- Quantidade de OS concluídas no período.
-- Resumo financeiro por status.
-- Lista de materiais com estoque baixo.
-- Exportação CSV do Financeiro.
-- Exportação CSV das Ordens de Serviço.
-- Exportação CSV dos Materiais.
-- Alertas no Dashboard:
-  - estoque baixo;
-  - lançamentos vencidos;
-  - vencimentos nos próximos 7 dias;
-  - compromissos do dia.
-- PDFs/Impressão com layout A4 melhorado.
-- RLS mais restritiva no Supabase:
-  - Financeiro: Administrador e Escritório;
-  - Fornecedores/Compras: Administrador e Escritório;
-  - Configurações: todos autenticados podem ler, somente Administrador altera;
-  - Perfis: Administrador gerencia, usuário pode consultar o próprio perfil.
+## Estrutura de acesso
+
+### Administrador da plataforma
+- Gerencia empresas, situação e quantidade de licenças.
+- Não possui acesso aos clientes, materiais, financeiro, OS, orçamentos e demais dados operacionais das empresas.
+- O isolamento é feito no Supabase/RLS, não apenas escondendo menus.
+
+### Gerente
+- Pertence a uma empresa.
+- Acessa todos os módulos daquela empresa.
+- Gerencia usuários, cargos e permissões da própria empresa.
+
+### Colaborador
+- Pertence a uma empresa.
+- Recebe um cargo criado pelo Gerente.
+- O cargo define permissões de Visualizar, Criar/Editar e Excluir por módulo.
+
+## Novidades funcionais
+- Cargos personalizados.
+- Gestão de empresas e licenças.
+- Limite de usuários ativos por empresa.
+- Clientes PJ com representante legal e vários contatos.
+- Código automático `MAT-000001` para novos materiais.
+- Lucro em R$ e percentual sobre custo nos materiais.
+- Recibos com itens e parcelamento por datas/valores.
+- Materiais vinculados a serviços.
+- Ao adicionar um serviço em Orçamento, OS ou Recibo, os materiais vinculados são adicionados automaticamente.
+- Correção do seletor/pesquisa de materiais e serviços.
+- Menu lateral rolável.
+- Isolamento multiempresa nas tabelas operacionais.
 
 ## Instalação
-1. Não apague a V5 ou seus dados.
-2. Execute `supabase-v6.sql` no SQL Editor do Supabase.
-3. Se o SQL executar sem erro, substitua no GitHub:
-   - index.html
-   - style.css
-   - app.js
-4. Faça commit na `main`.
-5. Aguarde o GitHub Pages e pressione Ctrl+F5.
+1. Faça backup do banco Supabase antes desta migração.
+2. Execute `supabase-v7.sql` no SQL Editor.
+3. Se terminar sem erro, substitua no GitHub:
+   - `index.html`
+   - `style.css`
+   - `app.js`
+4. Commit na `main`.
+5. Atualize com Ctrl+F5.
 
-## Importante sobre usuários
-A função de perfil usa o e-mail autenticado no Supabase Auth e procura o mesmo e-mail em `usuarios_perfis`.
+## Migração dos dados atuais
+Os dados existentes são associados automaticamente à empresa `Empresa Principal`.
+Os usuários já cadastrados na V6 são migrados como Gerentes dessa empresa para não perderem acesso.
 
-Para preservar seu acesso durante a atualização, um login que ainda não tenha perfil cadastrado é tratado como Administrador. Depois que todos os usuários estiverem configurados, podemos remover esse fallback numa próxima migração e exigir perfil explícito.
+## Criando o Administrador da plataforma
+Por segurança, a migração NÃO transforma automaticamente seu usuário atual em Administrador da plataforma, porque isso faria esse login perder acesso aos dados operacionais.
 
-## CSV
-Os arquivos são gerados com separador `;` e BOM UTF-8, facilitando a abertura no Excel em português do Brasil.
+Crie/entre com uma conta separada no Supabase Auth para ser o Administrador da plataforma. Enquanto ainda não existir nenhum administrador, essa conta pode chamar a função:
+`bootstrap_platform_admin`
 
-## Alertas
-Os alertas são calculados ao carregar os dados atuais. Não enviam notificações fora do sistema; eles aparecem no Dashboard.
+Depois disso, esse login verá apenas a área Administração SaaS e não verá os dados internos das empresas.
+
+## Licenças
+O Administrador define `licencas_max`, validade e situação da empresa.
+O Gerente não consegue ativar usuários além da quantidade de licenças contratadas.
+
+## Observação de segurança
+A V7 endurece as políticas RLS. Por isso é importante executar o SQL antes de publicar os novos arquivos HTML/JS/CSS.

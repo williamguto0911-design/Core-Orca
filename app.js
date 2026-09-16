@@ -600,91 +600,120 @@ function movementForm(){
 }
 
 function itemEditorHTML(){
- return `<div class="item-builder"><b>Itens</b><div class="form-grid"><label>Tipo<select id="item-tipo"><option value="material">Material</option><option value="servico">Serviço</option></select></label><label>Pesquisar<input id="item-search" autocomplete="off" placeholder="Digite parte do código ou nome..."><div id="item-suggestions" class="suggestions hidden"></div></label><label>Quantidade<input id="item-qtd" type="number" min="0.001" step="0.001" value="1"></label><label>Valor unitário<input id="item-valor" type="number" min="0" step="0.01"></label></div><input id="item-id" type="hidden"><button type="button" id="add-item" class="btn secondary">Adicionar item</button><div class="items-table"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th><th></th></tr></thead><tbody id="editor-itens"></tbody></table></div><div class="totals"><span>Subtotal: <span id="editor-subtotal">R$ 0,00</span></span><span>Total: <span id="editor-total">R$ 0,00</span></span></div></div>`;
+ return `<div class="item-builder"><b>Itens</b>
+ <div class="form-grid">
+   <label>Tipo
+     <select id="item-tipo">
+       <option value="material">Material</option>
+       <option value="servico">Serviço</option>
+     </select>
+   </label>
+   <label>Material / Serviço
+     <select id="item-select">
+       <option value="">Selecione...</option>
+     </select>
+   </label>
+   <label>Quantidade
+     <input id="item-qtd" type="number" min="0.001" step="0.001" value="1">
+   </label>
+   <label>Valor unitário
+     <input id="item-valor" type="number" min="0" step="0.01">
+   </label>
+ </div>
+ <button type="button" id="add-item" class="btn secondary">Adicionar item</button>
+ <div class="items-table"><table>
+   <thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th><th></th></tr></thead>
+   <tbody id="editor-itens"></tbody>
+ </table></div>
+ <div class="totals">
+   <span>Subtotal: <span id="editor-subtotal">R$ 0,00</span></span>
+   <span>Total: <span id="editor-total">R$ 0,00</span></span>
+ </div></div>`;
 }
 function setupItemEditor(){
- const search=$("item-search"), suggestions=$("item-suggestions"), tipoEl=$("item-tipo");
- const idEl=$("item-id"), valorEl=$("item-valor"), qtdEl=$("item-qtd"), addEl=$("add-item");
- let timer=null;
+ const tipoEl=$("item-tipo"), selectEl=$("item-select"), valorEl=$("item-valor"),
+       qtdEl=$("item-qtd"), addEl=$("add-item");
 
- const normalize=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
- const clearSelection=()=>{idEl.value="";valorEl.value=""};
- const hideSuggestions=()=>{suggestions.innerHTML="";suggestions.classList.add("hidden")};
-
- function doSearch(){
-   const words=normalize(search.value).split(/\s+/).filter(Boolean);
-   clearSelection();
-   if(!words.length){hideSuggestions();return}
-
+ function preencherSelect(){
    const tipo=tipoEl.value;
-   const source=tipo==="material"?materiais:servicos;
-   const found=source.filter(x=>{
-     const text=normalize([x.codigo,x.nome,x.descricao,x.categoria,x.fabricante].filter(Boolean).join(" "));
-     return words.every(w=>text.includes(w));
-   }).slice(0,30);
-
-   suggestions.innerHTML=found.length?found.map((x,i)=>`
-     <button type="button" class="suggestion suggestion-button" data-result="${i}">
-       <span><b>${esc(x.codigo||"")}</b>${x.codigo?" — ":""}${esc(x.nome||"")}${x.categoria?` <small>• ${esc(x.categoria)}</small>`:""}</span>
-       <span class="muted">${money(tipo==="material"?Number(x.preco_venda||0):Number(x.valor||0))}</span>
-     </button>`).join(""):`<div class="suggestion muted">Nenhum resultado encontrado.</div>`;
-   suggestions.classList.remove("hidden");
-
-   suggestions.querySelectorAll("[data-result]").forEach(el=>el.onclick=()=>{
-     const x=found[Number(el.dataset.result)];
-     if(!x)return;
-     idEl.value=x.id;
-     search.value=`${x.codigo?x.codigo+" - ":""}${x.nome||""}`;
-     valorEl.value=tipo==="material"?Number(x.preco_venda||0):Number(x.valor||0);
-     hideSuggestions();
-   });
+   const source=(tipo==="material"?materiais:servicos).slice().sort((a,b)=>
+     String(a.nome||"").localeCompare(String(b.nome||""),"pt-BR")
+   );
+   selectEl.innerHTML='<option value="">Selecione...</option>'+source.map(x=>{
+     const codigo=x.codigo?`[${esc(x.codigo)}] `:"";
+     const categoria=x.categoria?` — ${esc(x.categoria)}`:"";
+     return `<option value="${x.id}">${codigo}${esc(x.nome||"")}${categoria}</option>`;
+   }).join("");
+   valorEl.value="";
  }
 
- search.addEventListener("input",()=>{
-   clearTimeout(timer);
-   timer=setTimeout(doSearch,50);
- });
- search.addEventListener("focus",()=>{if(search.value.trim())doSearch()});
- search.addEventListener("keydown",e=>{if(e.key==="Escape")hideSuggestions()});
+ tipoEl.onchange=()=>{
+   preencherSelect();
+   qtdEl.value=1;
+ };
 
- tipoEl.addEventListener("change",()=>{
-   search.value="";
-   clearSelection();
-   hideSuggestions();
-   search.focus();
- });
+ selectEl.onchange=()=>{
+   const tipo=tipoEl.value;
+   const source=tipo==="material"?materiais:servicos;
+   const x=source.find(y=>String(y.id)===String(selectEl.value));
+   if(!x){valorEl.value="";return}
+   valorEl.value=tipo==="material"
+     ? Number(x.preco_venda||0).toFixed(2)
+     : Number(x.valor||0).toFixed(2);
+ };
 
  addEl.onclick=async()=>{
-   const tipo=tipoEl.value,id=idEl.value,qtd=Number(qtdEl.value),valor=Number(valorEl.value);
-   if(!id||qtd<=0)return toast("Selecione um item pela lista de resultados.");
+   const tipo=tipoEl.value;
+   const id=selectEl.value;
+   const qtd=Number(qtdEl.value);
+   const valor=Number(valorEl.value);
+   if(!id)return toast("Selecione um material ou serviço.");
+   if(!Number.isFinite(qtd)||qtd<=0)return toast("Informe uma quantidade válida.");
+
    const source=tipo==="material"?materiais:servicos;
    const x=source.find(y=>String(y.id)===String(id));
    if(!x)return toast("Item não encontrado.");
 
-   editorItens.push({tipo,referencia_id:id,descricao:x.nome,quantidade:qtd,valor_unitario:valor});
+   editorItens.push({
+     tipo,
+     referencia_id:x.id,
+     descricao:x.nome,
+     quantidade:qtd,
+     valor_unitario:Number.isFinite(valor)?valor:0
+   });
 
    if(tipo==="servico"){
-     const {data,error}=await sb.from("servico_materiais").select("*").eq("servico_id",id);
+     const {data,error}=await sb.from("servico_materiais")
+       .select("*")
+       .eq("servico_id",x.id);
+
      if(error){
        console.error("Erro ao carregar materiais vinculados:",error);
-       toast("Serviço adicionado, mas houve erro ao carregar os materiais vinculados.");
+       toast("Serviço incluído, mas houve erro ao carregar os materiais vinculados.");
      }else{
        (data||[]).forEach(sm=>{
          const mat=materiais.find(mm=>String(mm.id)===String(sm.material_id));
-         if(mat)editorItens.push({
-           tipo:"material",referencia_id:mat.id,
-           descricao:`${mat.nome} (material do serviço ${x.nome})`,
-           quantidade:Number(sm.quantidade||0)*qtd,
-           valor_unitario:Number(mat.preco_venda||0),
-           origem_servico_id:id
-         });
+         if(mat){
+           editorItens.push({
+             tipo:"material",
+             referencia_id:mat.id,
+             descricao:`${mat.nome} (material do serviço ${x.nome})`,
+             quantidade:Number(sm.quantidade||0)*qtd,
+             valor_unitario:Number(mat.preco_venda||0),
+             origem_servico_id:x.id
+           });
+         }
        });
      }
    }
 
-   search.value="";idEl.value="";valorEl.value="";qtdEl.value=1;
-   hideSuggestions();renderEditorItens();search.focus();
+   selectEl.value="";
+   qtdEl.value=1;
+   valorEl.value="";
+   renderEditorItens();
  };
+
+ preencherSelect();
  renderEditorItens();
 }
 function renderEditorItens(){

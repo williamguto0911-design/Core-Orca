@@ -173,3 +173,7 @@
 .suggestion-button{display:flex!important;width:100%;justify-content:space-between;align-items:center;gap:12px;text-align:left;border:0;border-bottom:1px solid #e5e7eb;background:#fff;cursor:pointer}
 .suggestion-button:hover,.suggestion-button:focus{background:#f3f6fb;outline:none}
 .suggestion-button small{color:#6b7280}
+
+/* V13 — seleção de itens por menu suspenso */
+#item-select{width:100%;min-height:42px}
+#item-select option{font-size:14px}

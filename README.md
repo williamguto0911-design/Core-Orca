@@ -1,16 +1,28 @@
-# Core-Orca V12
+# Core-Orca V13
 
-Correção da busca de materiais e serviços no componente compartilhado por:
+## Correção do seletor de materiais/serviços
+
+O campo de pesquisa foi removido do editor de itens de:
 - Orçamentos
 - Ordens de Serviço
 - Recibos
 
-A busca agora é parcial, reage enquanto digita, ignora acentos/maiúsculas e pesquisa código, nome, descrição, categoria e fabricante. Também aceita múltiplas palavras, como `cabo 2,5`.
+Ele foi substituído por um **menu suspenso (`select`)**, seguindo o mesmo funcionamento usado para selecionar Clientes.
 
-A inclusão automática dos materiais vinculados a um serviço foi preservada.
+### Funcionamento
+1. Escolha `Material` ou `Serviço`.
+2. O segundo menu é preenchido automaticamente com os cadastros correspondentes.
+3. Selecione o material/serviço.
+4. O valor unitário é preenchido automaticamente.
+5. Informe a quantidade.
+6. Clique em `Adicionar item`.
+
+Os materiais aparecem ordenados alfabeticamente e, quando disponíveis, mostram código e categoria.
+
+Ao selecionar um Serviço, os materiais vinculados ao serviço continuam sendo incluídos automaticamente.
 
 ## Atualização
-Não existe SQL V12 e não é necessário alterar/republicar a Edge Function.
+Não há SQL V13 e não há alteração na Edge Function.
 
 Substitua no GitHub:
 - `app.js`

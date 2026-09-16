@@ -1,38 +1,35 @@
-# Core-Orca V8
+# Core-Orca V9 — Correção de acesso aos módulos
 
-## Correção principal
+A V9 corrige o caso em que, após a migração multiempresa da V7, o usuário entra no sistema mas somente o botão Dashboard aparece.
 
-A V8 corrige o menu lateral da V7.
+## Causa
+O menu já estava com o CSS correto na V8. Os demais botões eram ocultados porque o login não estava sendo reconhecido como Gerente/Colaborador de uma empresa ativa.
 
-### Problema corrigido
-Na V7, o `<nav>` lateral usava `display: grid` e também ocupava todo o espaço livre da sidebar.
-Quando permissões ocultavam parte dos menus, as poucas linhas restantes do Grid eram esticadas verticalmente.
-Isso fazia, por exemplo, o botão Dashboard ocupar uma área enorme.
-
-### Novo comportamento
-- Cabeçalho/logo permanece no topo.
-- Itens do menu ficam imediatamente um abaixo do outro.
-- Cada botão mantém altura normal.
-- Quando houver mais opções do que cabem na tela, somente a lista de menus terá rolagem vertical.
-- E-mail do usuário e botão Sair permanecem na parte inferior.
-- Compatível com desktop e celular.
-- Usa `100dvh` em navegadores modernos para melhorar o comportamento em telas móveis.
+## Correções
+- Contexto de usuário mais robusto.
+- Comparação de e-mails normalizada.
+- Gerente sempre recebe acesso completo aos módulos da própria empresa.
+- Colaborador continua respeitando as permissões do cargo.
+- Administrador SaaS continua sem acesso aos dados operacionais.
+- Nova tentativa automática de migrar usuários antigos para a Empresa Principal.
+- RPC de reparo para login antigo sem vínculo.
+- Mantida a correção de rolagem do menu da V8.
 
 ## Instalação
+1. Execute `supabase-v9.sql` no SQL Editor do Supabase.
+2. Substitua no GitHub:
+   - `index.html`
+   - `style.css`
+   - `app.js`
+3. Commit na `main`.
+4. Ctrl + F5.
+5. Saia e entre novamente no sistema.
 
-A V8 NÃO exige alteração no banco de dados.
+## Se ainda aparecer somente Dashboard
+Com o usuário operacional logado, abra o Console do navegador e execute:
 
-Não execute novamente `supabase-v7.sql`.
+`await sb.rpc('reparar_meu_acesso_empresa_principal')`
 
-Substitua no GitHub:
-- `index.html`
-- `style.css`
-- `app.js`
+Depois saia e entre novamente.
 
-Depois:
-1. Faça commit na branch `main`.
-2. Aguarde o GitHub Pages atualizar.
-3. Pressione `Ctrl + F5`.
-
-## Banco de dados
-A V8 continua utilizando normalmente o banco/migração da V7.
+Essa função só repara usuários sem vínculo ativo. Ela não permite que um Administrador SaaS acesse os dados de uma empresa.

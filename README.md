@@ -1,34 +1,19 @@
-# Core-Orça V15.4 — Busca inteligente e máscaras
+# Core-Orça V15.5 — Correção de Cargos
 
-## Busca inteligente
-A busca agora:
-- ignora acentos e pontuação;
-- ignora maiúsculas/minúsculas;
-- aceita várias partes/abreviações na mesma consulta;
-- exige que cada termo digitado exista em algum ponto do cadastro;
-- pesquisa todos os campos disponíveis do registro.
+Corrige o erro de RLS ao criar um cargo.
 
-Exemplo: `abrac nylo 100` encontra `Abraçadeira Nylon 100mm`.
-
-Em Clientes e Fornecedores, a busca também considera documento, telefone, celular, e-mail, CEP, endereço, número, bairro, cidade, estado e demais campos carregados. Documentos e telefones podem ser pesquisados com ou sem máscara.
-
-O mesmo mecanismo foi aplicado às pesquisas de Materiais, Serviços, Estoque, Clientes, Fornecedores, Técnicos, Usuários, Cargos, Orçamentos, OS, Recibos, Compras, Catálogo Base, catálogo da empresa, pesquisa de material em compras e menus suspensos pesquisáveis.
-
-## Máscaras
-Foram adicionadas máscaras de:
-- CPF: `000.000.000-00`
-- CNPJ: `00.000.000/0000-00`
-- CEP: `00000-000`
-- Telefone: `(00) 0000-0000`
-- Celular: `(00) 00000-0000`
-
-Aplicadas aos formulários de Clientes, representante legal, contatos PJ, Fornecedores, Técnicos e Configurações da Empresa, conforme o tipo de campo.
+## Causa
+O frontend tentava inserir diretamente em `public.cargos`. A nova versão usa uma RPC segura que:
+- identifica a empresa do usuário autenticado;
+- grava `empresa_id` explicitamente;
+- permite Gerente ou usuário com permissão de escrita em Configurações;
+- impede o Administrador da Plataforma de alterar cargos internos das empresas;
+- garante que a edição só atinja cargos da própria empresa.
 
 ## Instalação
-Não há SQL novo e não há alteração na Edge Function.
+1. Execute `supabase-v15.5.sql` no SQL Editor do Supabase.
+2. Substitua somente `app.js` no GitHub.
+3. Faça commit, aguarde o GitHub Pages e pressione Ctrl+F5.
+4. Saia e entre novamente no sistema antes de testar `Cargos e Permissões → + Cargo`.
 
-Substitua:
-- `app.js`
-- `index.html`
-
-Depois faça commit, aguarde o GitHub Pages e pressione Ctrl+F5.
+Não é necessário alterar a Edge Function.

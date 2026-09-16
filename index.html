@@ -40,7 +40,7 @@
         <button class="nav-item" data-page="relatorios" data-module="relatorios">Relatórios</button>
         <button class="nav-item manager-only" data-page="usuarios">Usuários</button>
         <button class="nav-item manager-only" data-page="cargos">Cargos e Permissões</button>
-        <button class="nav-item platform-only hidden" data-page="admin-plataforma">Administração SaaS</button>
+        <button class="nav-item platform-only hidden" data-page="admin-plataforma">Empresas e Licenças</button>
         <button class="nav-item" data-page="configuracoes" data-module="configuracoes">Configurações</button>
       </nav>
       <div class="sidebar-footer">
@@ -190,13 +190,17 @@
 
       <section id="page-admin-plataforma" class="page hidden platform-only">
         <div class="panel">
-          <div class="panel-head"><div><h3>Administração da plataforma</h3><p class="muted">Gestão de empresas e licenças. Este perfil não possui acesso aos dados operacionais das empresas.</p></div><button id="nova-empresa-saas" class="btn primary">+ Empresa</button></div>
+          <div class="panel-head"><div><h3>Empresas e Licenças</h3><p class="muted">Administração comercial do Core-Orça: cadastre empresas, defina licenças, validade e situação de acesso. Os dados internos de cada empresa permanecem isolados.</p></div><button id="nova-empresa-saas" class="btn primary">+ Empresa</button></div>
+          <div class="saas-owner-card">
+            <div><span class="muted">Administrador da plataforma</span><strong id="saas-admin-email">admin@coreorca.com.br</strong></div>
+            <div><span class="muted">Empresa administradora</span><strong>Administração Core Orça</strong></div>
+          </div>
           <div class="stats">
             <article><span>Empresas</span><strong id="saas-empresas">0</strong></article>
             <article><span>Licenças contratadas</span><strong id="saas-licencas">0</strong></article>
             <article><span>Usuários ativos</span><strong id="saas-usuarios">0</strong></article>
           </div>
-          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Documento</th><th>Status</th><th>Licenças</th><th>Em uso</th><th>Validade</th><th></th></tr></thead><tbody id="saas-table"></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Documento</th><th>Responsável</th><th>Status</th><th>Licenças</th><th>Em uso</th><th>Validade</th><th></th></tr></thead><tbody id="saas-table"></tbody></table></div>
         </div>
       </section>
 

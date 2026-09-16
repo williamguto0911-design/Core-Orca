@@ -133,7 +133,7 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Administração SaaS",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 function renderClientes(){
@@ -263,12 +263,58 @@ function cargoForm(c={}){
  $("entity-form").onsubmit=async e=>{e.preventDefault();const perms={};document.querySelectorAll("[data-pm]").forEach(x=>{perms[x.dataset.pm]??={};perms[x.dataset.pm][x.dataset.pa]=x.checked});const obj={nome:$("f-nome").value.trim(),descricao:$("f-desc").value.trim(),permissoes:perms};const r=c.id?await sb.from("cargos").update(obj).eq("id",c.id):await sb.from("cargos").insert(obj);if(r.error)return toast(r.error.message);closeModal();await loadCargos();renderCargos();toast("Cargo salvo")};
 }
 
-function renderSaasAdmin(){if(!currentUserProfile?.is_platform_admin)return;const total=empresasSaas.reduce((s,e)=>s+Number(e.licencas_max||0),0),used=empresasSaas.reduce((s,e)=>s+Number(e.licencas_usadas||0),0);$("saas-empresas").textContent=empresasSaas.length;$("saas-licencas").textContent=total;$("saas-usuarios").textContent=used;$("saas-table").innerHTML=empresasSaas.map(e=>`<tr><td><b>${esc(e.nome)}</b></td><td>${esc(e.documento||"-")}</td><td class="${e.ativa?"license-ok":"license-blocked"}">${e.ativa?"Ativa":"Bloqueada"}</td><td>${e.licencas_max}</td><td>${e.licencas_usadas}</td><td>${e.licenca_validade?new Date(e.licenca_validade+"T12:00:00").toLocaleDateString("pt-BR"):"Sem limite"}</td><td><button class="action-btn" onclick="empresaSaasForm(empresasSaas.find(x=>x.id==='${e.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="7">Nenhuma empresa.</td></tr>'}
-function empresaSaasForm(e={}){
- openModal(e.id?"Editar empresa/licença":"Nova empresa",`<form id="entity-form"><div class="form-grid"><label>Empresa*<input id="f-nome" required value="${esc(e.nome)}"></label><label>CNPJ/Documento<input id="f-doc" value="${esc(e.documento)}"></label><label>Licenças<input id="f-lic" type="number" min="1" value="${e.licencas_max||1}"></label><label>Validade<input id="f-validade" type="date" value="${e.licenca_validade||""}"></label><label>Status<select id="f-ativa"><option value="true" ${e.ativa!==false?"selected":""}>Ativa</option><option value="false" ${e.ativa===false?"selected":""}>Bloqueada</option></select></label><label>E-mail do gerente inicial<input id="f-gerente" type="email" placeholder="Opcional"></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async ev=>{ev.preventDefault();const payload={p_id:e.id||null,p_nome:$("f-nome").value.trim(),p_documento:$("f-doc").value.trim()||null,p_licencas:Number($("f-lic").value)||1,p_validade:$("f-validade").value||null,p_ativa:$("f-ativa").value==="true",p_gerente_email:$("f-gerente").value.trim().toLowerCase()||null};const {error}=await sb.rpc("admin_upsert_empresa",payload);if(error)return toast(error.message);closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Empresa/licença salva")};
+function renderSaasAdmin(){
+ if(!currentUserProfile?.is_platform_admin)return;
+ const total=empresasSaas.reduce((s,e)=>s+Number(e.licencas_max||0),0);
+ const used=empresasSaas.reduce((s,e)=>s+Number(e.licencas_usadas||0),0);
+ $("saas-empresas").textContent=empresasSaas.length;
+ $("saas-licencas").textContent=total;
+ $("saas-usuarios").textContent=used;
+ if($("saas-admin-email"))$("saas-admin-email").textContent=currentUserProfile?.email||"admin@coreorca.com.br";
+ $("saas-table").innerHTML=empresasSaas.map(e=>`<tr>
+   <td><b>${esc(e.nome)}</b></td>
+   <td>${esc(e.documento||"-")}</td>
+   <td>${esc(e.responsavel_nome||"-")}<br><small>${esc(e.responsavel_email||"")}</small></td>
+   <td class="${e.ativa?"license-ok":"license-blocked"}">${e.ativa?"Ativa":"Bloqueada"}</td>
+   <td>${e.licencas_max}</td><td>${e.licencas_usadas}</td>
+   <td>${e.licenca_validade?new Date(e.licenca_validade+"T12:00:00").toLocaleDateString("pt-BR"):"Sem limite"}</td>
+   <td><button class="action-btn" onclick="empresaSaasForm(empresasSaas.find(x=>x.id==='${e.id}'))">Editar</button></td>
+ </tr>`).join("")||'<tr><td colspan="8">Nenhuma empresa cadastrada.</td></tr>';
 }
-
+function empresaSaasForm(e={}){
+ openModal(e.id?"Editar empresa/licença":"Cadastrar empresa",`<form id="entity-form">
+ <div class="form-grid">
+   <label>Empresa*<input id="f-nome" required value="${esc(e.nome)}"></label>
+   <label>CNPJ/Documento<input id="f-doc" value="${esc(e.documento)}"></label>
+   <label>Responsável<input id="f-resp-nome" value="${esc(e.responsavel_nome)}"></label>
+   <label>E-mail do responsável<input id="f-resp-email" type="email" value="${esc(e.responsavel_email)}"></label>
+   <label>Quantidade de licenças*<input id="f-lic" type="number" min="1" required value="${e.licencas_max||1}"></label>
+   <label>Validade da licença<input id="f-validade" type="date" value="${e.licenca_validade||""}"></label>
+   <label>Status<select id="f-ativa"><option value="true" ${e.ativa!==false?"selected":""}>Ativa</option><option value="false" ${e.ativa===false?"selected":""}>Bloqueada</option></select></label>
+   <label>E-mail do Gerente inicial<input id="f-gerente" type="email" value="${esc(e.gerente_email||e.responsavel_email||"")}" placeholder="Login que administrará esta empresa"></label>
+   <label class="span-2">Observações comerciais<textarea id="f-obs">${esc(e.observacoes_licenca)}</textarea></label>
+ </div>
+ <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar empresa</button></div>
+ </form>`);
+ $("entity-form").onsubmit=async ev=>{
+   ev.preventDefault();
+   const payload={
+     p_id:e.id||null,
+     p_nome:$("f-nome").value.trim(),
+     p_documento:$("f-doc").value.trim()||null,
+     p_licencas:Number($("f-lic").value)||1,
+     p_validade:$("f-validade").value||null,
+     p_ativa:$("f-ativa").value==="true",
+     p_gerente_email:$("f-gerente").value.trim().toLowerCase()||null,
+     p_responsavel_nome:$("f-resp-nome").value.trim()||null,
+     p_responsavel_email:$("f-resp-email").value.trim().toLowerCase()||null,
+     p_observacoes:$("f-obs").value.trim()||null
+   };
+   const {error}=await sb.rpc("admin_upsert_empresa_v10",payload);
+   if(error)return toast("Erro: "+error.message);
+   closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Empresa e licenças salvas.");
+ };
+}
 function renderFornecedores(){
  const q=$("fornecedor-search").value.toLowerCase(), rows=fornecedores.filter(f=>[f.nome,f.documento,f.telefone,f.email,f.cidade].some(v=>String(v||"").toLowerCase().includes(q)));
  $("fornecedores-table").innerHTML=rows.map(f=>`<tr><td><b>${esc(f.nome)}</b><br><span class="muted">${esc(f.email||"")}</span></td><td>${esc(f.documento||"-")}</td><td>${esc(f.telefone||"-")}</td><td>${esc([f.cidade,f.uf].filter(Boolean).join("/")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editFornecedor('${f.id}')">Editar</button><button class="action-btn" onclick="deleteFornecedor('${f.id}')">Excluir</button></div></td></tr>`).join("")||'<tr><td colspan="5">Nenhum fornecedor.</td></tr>';

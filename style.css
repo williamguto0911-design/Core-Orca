@@ -139,3 +139,18 @@
     -webkit-overflow-scrolling:touch;
   }
 }
+
+/* V10 - Administração comercial */
+.saas-owner-card{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  padding:14px;
+  margin:12px 0 16px;
+  border:1px solid #d8b4fe;
+  background:#faf5ff;
+  border-radius:12px;
+}
+.saas-owner-card div{display:flex;flex-direction:column;gap:4px}
+.saas-owner-card strong{font-size:15px}
+@media(max-width:650px){.saas-owner-card{grid-template-columns:1fr}}

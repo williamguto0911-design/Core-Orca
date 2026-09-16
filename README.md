@@ -1,35 +1,37 @@
-# Core-Orca V9 — Correção de acesso aos módulos
+# Core-Orca V10 — Administração Core Orça
 
-A V9 corrige o caso em que, após a migração multiempresa da V7, o usuário entra no sistema mas somente o botão Dashboard aparece.
+## Configuração solicitada
+A migração cria/garante:
+- Empresa administradora: **Administração Core Orça**
+- Administrador da plataforma: **admin@coreorca.com.br**
+- Aba **Empresas e Licenças**
 
-## Causa
-O menu já estava com o CSS correto na V8. Os demais botões eram ocultados porque o login não estava sendo reconhecido como Gerente/Colaborador de uma empresa ativa.
+## O que o Administrador pode fazer
+- Cadastrar empresas clientes do Core-Orça.
+- Definir quantidade de licenças.
+- Definir validade da licença.
+- Ativar/bloquear uma empresa.
+- Informar responsável comercial.
+- Informar Gerente inicial da empresa.
+- Visualizar quantidade de licenças contratadas e utilizadas.
+- Editar posteriormente os dados comerciais/licenciamento.
 
-## Correções
-- Contexto de usuário mais robusto.
-- Comparação de e-mails normalizada.
-- Gerente sempre recebe acesso completo aos módulos da própria empresa.
-- Colaborador continua respeitando as permissões do cargo.
-- Administrador SaaS continua sem acesso aos dados operacionais.
-- Nova tentativa automática de migrar usuários antigos para a Empresa Principal.
-- RPC de reparo para login antigo sem vínculo.
-- Mantida a correção de rolagem do menu da V8.
+## Separação dos dados
+O login `admin@coreorca.com.br` é Administrador SaaS. Ele administra a plataforma e o licenciamento, mas não é usuário operacional das empresas e não consulta clientes, materiais, financeiro, OS etc. Isso mantém o isolamento entre empresas.
+
+Cada empresa licenciada possui seu próprio Gerente. O Gerente controla todos os dados da própria empresa e cadastra Colaboradores conforme a quantidade de licenças disponível.
 
 ## Instalação
-1. Execute `supabase-v9.sql` no SQL Editor do Supabase.
-2. Substitua no GitHub:
+1. Execute `supabase-v10.sql` no SQL Editor do Supabase.
+2. Se executar sem erro, substitua no GitHub:
    - `index.html`
    - `style.css`
    - `app.js`
 3. Commit na `main`.
 4. Ctrl + F5.
-5. Saia e entre novamente no sistema.
+5. Saia e entre novamente com `admin@coreorca.com.br`.
 
-## Se ainda aparecer somente Dashboard
-Com o usuário operacional logado, abra o Console do navegador e execute:
+Ao entrar com esse login, a tela principal deverá ser **Empresas e Licenças**.
 
-`await sb.rpc('reparar_meu_acesso_empresa_principal')`
-
-Depois saia e entre novamente.
-
-Essa função só repara usuários sem vínculo ativo. Ela não permite que um Administrador SaaS acesse os dados de uma empresa.
+## Observação
+Não execute novamente os SQLs V7/V9 depois da V10.

@@ -85,6 +85,7 @@ function clienteForm(c={}){
  <label class="span-2">Observações<textarea id="f-obs" rows="3">${esc(c.observacoes)}</textarea></label>
  </div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
  $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={tipo_pessoa:$("f-tipo").value,nome:$("f-nome").value.trim(),documento:$("f-documento").value.trim(),telefone:$("f-telefone").value.trim(),celular:$("f-celular").value.trim(),email:$("f-email").value.trim(),email_cobranca:$("f-cobranca").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-endereco").value.trim(),numero:$("f-numero").value.trim(),complemento:$("f-complemento").value.trim(),bairro:$("f-bairro").value.trim(),cidade:$("f-cidade").value.trim(),estado:$("f-estado").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim()};const res=c.id?await sb.from("clientes").update(obj).eq("id",c.id):await sb.from("clientes").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();toast("Cliente salvo");await loadClientes();renderClientes();renderDashboard()}
+}
 function editCliente(id){const c=clientes.find(x=>x.id===id);if(c)clienteForm(c)}
 async function deleteCliente(id){if(!confirm("Excluir este cliente?"))return;const {error}=await sb.from("clientes").update({ativo:false}).eq("id",id);if(error)return toast("Erro: "+error.message);toast("Cliente excluído");await loadClientes();renderClientes();renderDashboard()}
 
@@ -102,6 +103,7 @@ function materialForm(m={}){
  <label>Preço de venda<input id="f-preco" type="number" step="0.01" value="${m.preco_venda??0}"></label>
  </div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
  $("entity-form").onsubmit=async e=>{e.preventDefault();const obj={codigo:$("f-codigo").value.trim()||null,nome:$("f-nome").value.trim(),descricao:$("f-descricao").value.trim(),categoria:$("f-categoria").value.trim(),fabricante:$("f-fabricante").value.trim(),unidade:$("f-unidade").value.trim()||"UN",estoque_atual:Number($("f-estoque").value)||0,estoque_minimo:Number($("f-minimo").value)||0,custo:Number($("f-custo").value)||0,preco_venda:Number($("f-preco").value)||0};const res=m.id?await sb.from("materiais").update(obj).eq("id",m.id):await sb.from("materiais").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();toast("Material salvo");await loadMateriais();renderMateriais();renderDashboard()}
+}
 function editMaterial(id){const m=materiais.find(x=>x.id===id);if(m)materialForm(m)}
 async function deleteMaterial(id){if(!confirm("Excluir este material?"))return;const {error}=await sb.from("materiais").update({ativo:false}).eq("id",id);if(error)return toast("Erro: "+error.message);toast("Material excluído");await loadMateriais();renderMateriais();renderDashboard()}
 

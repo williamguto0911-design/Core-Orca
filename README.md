@@ -1,30 +1,26 @@
-# Core-Orca V13
+# Core-Orca V14
 
-## Correção do seletor de materiais/serviços
+## Menus suspensos com pesquisa
 
-O campo de pesquisa foi removido do editor de itens de:
-- Orçamentos
-- Ordens de Serviço
-- Recibos
+A V14 adiciona pesquisa aos menus suspensos do sistema.
 
-Ele foi substituído por um **menu suspenso (`select`)**, seguindo o mesmo funcionamento usado para selecionar Clientes.
+O componente é aplicado automaticamente aos `select` existentes e também aos menus criados dinamicamente em modais.
 
 ### Funcionamento
-1. Escolha `Material` ou `Serviço`.
-2. O segundo menu é preenchido automaticamente com os cadastros correspondentes.
-3. Selecione o material/serviço.
-4. O valor unitário é preenchido automaticamente.
-5. Informe a quantidade.
-6. Clique em `Adicionar item`.
+- Clique no menu suspenso.
+- Um campo **Pesquisar...** aparece dentro do dropdown.
+- A busca é parcial.
+- Ignora maiúsculas/minúsculas e acentos.
+- A opção selecionada continua disparando o evento `change` original do sistema.
 
-Os materiais aparecem ordenados alfabeticamente e, quando disponíveis, mostram código e categoria.
+Isso inclui os seletores de Cliente, Material/Serviço, fornecedores, técnicos e demais cadastros que usam menus suspensos.
 
-Ao selecionar um Serviço, os materiais vinculados ao serviço continuam sendo incluídos automaticamente.
+Menus pequenos de controle, como o seletor `Material/Serviço` e alguns status booleanos, foram mantidos nativos para evitar alterar lógica interna desnecessariamente.
 
 ## Atualização
-Não há SQL V13 e não há alteração na Edge Function.
+Não há SQL novo e não há alteração na Edge Function.
 
-Substitua no GitHub:
+Substitua:
 - `app.js`
 - `style.css`
 

@@ -792,3 +792,86 @@ $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMa
 $("recibo-search").oninput=renderRecibos;$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
 init();
+
+
+/* V14 — pesquisa genérica em menus suspensos */
+function enhanceSearchableSelect(select){
+ if(!select || select.dataset.searchableReady==="1" || select.multiple || select.size>1) return;
+ if(select.id==="item-tipo" || select.id==="f-ativa") return;
+
+ select.dataset.searchableReady="1";
+ const wrap=document.createElement("div");
+ wrap.className="searchable-select";
+ select.parentNode.insertBefore(wrap,select);
+ wrap.appendChild(select);
+
+ const button=document.createElement("button");
+ button.type="button";
+ button.className="searchable-select-button";
+ const dropdown=document.createElement("div");
+ dropdown.className="searchable-select-dropdown hidden";
+ const input=document.createElement("input");
+ input.type="search";
+ input.className="searchable-select-search";
+ input.placeholder="Pesquisar...";
+ input.autocomplete="off";
+ const options=document.createElement("div");
+ options.className="searchable-select-options";
+
+ wrap.insertBefore(button,select);
+ dropdown.appendChild(input);
+ dropdown.appendChild(options);
+ wrap.appendChild(dropdown);
+ select.classList.add("native-select-hidden");
+
+ const norm=v=>String(v??"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().trim();
+
+ function selectedText(){
+   const op=select.options[select.selectedIndex];
+   return op ? op.textContent : "Selecione...";
+ }
+ function syncButton(){button.textContent=selectedText()||"Selecione..."}
+ function render(){
+   const q=norm(input.value);
+   const list=[...select.options].filter(op=>!op.disabled && (!q || norm(op.textContent).includes(q)));
+   options.innerHTML=list.length?list.map(op=>`<button type="button" class="searchable-option ${op.selected?"selected":""}" data-value="${encodeURIComponent(op.value)}">${esc(op.textContent)}</button>`).join("")
+     :'<div class="searchable-empty">Nenhuma opção encontrada.</div>';
+   options.querySelectorAll(".searchable-option").forEach(el=>el.onclick=()=>{
+     select.value=decodeURIComponent(el.dataset.value);
+     select.dispatchEvent(new Event("change",{bubbles:true}));
+     syncButton();
+     dropdown.classList.add("hidden");
+   });
+ }
+ button.onclick=()=>{
+   document.querySelectorAll(".searchable-select-dropdown").forEach(d=>{if(d!==dropdown)d.classList.add("hidden")});
+   dropdown.classList.toggle("hidden");
+   if(!dropdown.classList.contains("hidden")){
+     input.value="";render();setTimeout(()=>input.focus(),0);
+   }
+ };
+ input.oninput=render;
+ select.addEventListener("change",syncButton);
+
+ // Permite que código existente repovoe o select e o botão acompanhe.
+ new MutationObserver(()=>{syncButton();if(!dropdown.classList.contains("hidden"))render()})
+   .observe(select,{childList:true,subtree:true,attributes:true});
+
+ syncButton();
+}
+
+function enhanceAllSelects(root=document){
+ root.querySelectorAll("select").forEach(enhanceSearchableSelect);
+}
+
+const searchableSelectObserver=new MutationObserver(mutations=>{
+ mutations.forEach(m=>m.addedNodes.forEach(node=>{
+   if(node.nodeType!==1)return;
+   if(node.matches?.("select"))enhanceSearchableSelect(node);
+   enhanceAllSelects(node);
+ }));
+});
+document.addEventListener("DOMContentLoaded",()=>{
+ enhanceAllSelects();
+ searchableSelectObserver.observe(document.body,{childList:true,subtree:true});
+});

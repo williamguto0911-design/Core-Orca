@@ -519,9 +519,42 @@ function renderUsuarios(){
  $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
 }
 function usuarioForm(u={}){
- openModal(u.id?"Editar usuário":"Novo usuário da empresa",`<form id="entity-form"><div class="form-grid"><label>Nome<input id="f-nome" value="${esc(u.nome)}"></label><label>E-mail de login*<input id="f-email" type="email" required value="${esc(u.email)}"></label><label>Tipo<select id="f-tipo"><option value="colaborador" ${u.tipo!=="gerente"?"selected":""}>Colaborador</option><option value="gerente" ${u.tipo==="gerente"?"selected":""}>Gerente</option></select></label><label>Cargo do colaborador<select id="f-cargo"><option value="">Sem cargo</option>${cargos.map(c=>`<option value="${c.id}" ${u.cargo_id===c.id?"selected":""}>${esc(c.nome)}</option>`).join("")}</select></label><label>Ativo<select id="f-ativo"><option value="true">Sim</option><option value="false" ${u.ativo===false?"selected":""}>Não</option></select></label></div><div class="warning">A quantidade de usuários ativos não pode ultrapassar as licenças contratadas pela empresa.</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
- $("entity-form").onsubmit=async e=>{e.preventDefault();const {error}=await sb.rpc("gerente_upsert_usuario",{p_id:u.id||null,p_nome:$("f-nome").value.trim(),p_email:$("f-email").value.trim().toLowerCase(),p_tipo:$("f-tipo").value,p_cargo_id:$("f-tipo").value==="colaborador"?($("f-cargo").value||null):null,p_ativo:$("f-ativo").value==="true"});if(error)return toast(error.message);closeModal();await loadUsuarios();renderUsuarios();toast("Usuário salvo")};
+ const creating=!u.id;
+ openModal(creating?"Novo usuário da empresa":"Editar usuário",`<form id="entity-form">
+ <div class="form-grid">
+  <label>Nome*<input id="f-nome" required value="${esc(u.nome||"")}"></label>
+  <label>E-mail de login*<input id="f-email" type="email" required value="${esc(u.email||"")}" ${creating?"":"readonly"}></label>
+  <label>Tipo<select id="f-tipo"><option value="colaborador" ${u.tipo!=="gerente"?"selected":""}>Colaborador</option><option value="gerente" ${u.tipo==="gerente"?"selected":""}>Gerente</option></select></label>
+  <label>Cargo do colaborador<select id="f-cargo"><option value="">Sem cargo</option>${cargos.map(c=>`<option value="${c.id}" ${u.cargo_id===c.id?"selected":""}>${esc(c.nome)}</option>`).join("")}</select></label>
+  <label>Ativo<select id="f-ativo"><option value="true">Sim</option><option value="false" ${u.ativo===false?"selected":""}>Não</option></select></label>
+ </div>
+ ${creating?'<div class="force-password-note">Ao salvar, será criado o login no Supabase e uma senha temporária aleatória será exibida uma única vez. No primeiro acesso, o usuário deverá obrigatoriamente definir uma nova senha.</div>':""}
+ <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar usuário</button></div>
+ </form>`);
+ $("entity-form").onsubmit=async e=>{
+  e.preventDefault();
+  const nome=$("f-nome").value.trim();
+  const email=$("f-email").value.trim().toLowerCase();
+  const tipo=$("f-tipo").value;
+  const cargoId=tipo==="colaborador"?($("f-cargo").value||null):null;
+  const ativo=$("f-ativo").value==="true";
+
+  if(creating){
+   const {data:created,error:fnError}=await sb.functions.invoke("core-orca-admin-users",{
+    body:{action:"create-company-user",empresa_id:currentUserProfile?.empresa_id,email,nome,tipo,cargo_id:cargoId,ativo}
+   });
+   if(fnError||created?.error)return toast("Erro ao criar usuário: "+(created?.error||fnError?.message||"erro desconhecido"));
+   closeModal();await loadUsuarios();renderUsuarios();
+   showTemporaryPassword(email,created.temporary_password,"Usuário criado");
+   return;
+  }
+
+  const {error}=await sb.rpc("gerente_upsert_usuario",{p_id:u.id,p_nome:nome,p_email:email,p_tipo:tipo,p_cargo_id:cargoId,p_ativo:ativo});
+  if(error)return toast(error.message);
+  closeModal();await loadUsuarios();renderUsuarios();toast("Usuário salvo");
+ };
 }
+
 function editUsuario(id){const u=usuarios.find(x=>x.id===id);if(u)usuarioForm(u)}
 
 async function duplicateOrcamento(id){
@@ -590,18 +623,78 @@ async function openSignature(osId){
  $("sig-clear").onclick=()=>pad.clear();
  $("sig-save").onclick=async()=>{if(pad.isEmpty())return toast("Faça a assinatura.");const {error}=await sb.from("ordens_servico").update({assinatura_nome:$("sig-name").value.trim(),assinatura_data_url:pad.toDataURL("image/png"),assinatura_em:new Date().toISOString()}).eq("id",osId);if(error)return toast(error.message);await addOSTimeline(osId,"assinatura","Assinatura do cliente registrada.");toast("Assinatura salva");await loadOrdens();await viewOS(osId)};
 }
-function printDocument(title,header,items,notes){
+function printDocument(title,header,items,notes,options={}){
  const w=window.open("","_blank");if(!w)return toast("Permita pop-ups para gerar o PDF.");
- const rows=items.map(i=>`<tr><td>${esc(statusLabel(i.tipo))}</td><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("");
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:16mm}body{font-family:Arial,sans-serif;color:#111;font-size:12px}img{display:block;margin-bottom:8px}h1{font-size:20px;margin:0 0 3px}h2{font-size:17px;border-bottom:2px solid #111;padding-bottom:6px;margin-top:18px}p{margin:4px 0}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border-bottom:1px solid #ddd;padding:7px;text-align:left;font-size:11px}th{background:#f3f4f6}.total{text-align:right;font-size:17px;font-weight:bold;margin-top:16px}.muted{color:#666}.doc-footer{margin-top:28px;padding-top:8px;border-top:1px solid #ddd;font-size:10px;color:#666}@media print{button{display:none}}</style></head><body>${companyHeader()}<h2>${esc(title)}</h2>${header}<table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th>Unitário</th><th>Total</th></tr></thead><tbody>${rows}</tbody></table>${notes||""}<div class="doc-footer">${esc(empresa?.rodape_documentos||"")}</div><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();
+ const e=empresa||{};
+ const rows=items.map(i=>`<tr>
+  <td><span class="pill">${esc(statusLabel(i.tipo))}</span></td>
+  <td class="desc">${esc(i.descricao)}</td>
+  <td class="num">${Number(i.quantidade||0).toLocaleString("pt-BR")}</td>
+  <td class="money">${money(i.valor_unitario)}</td>
+  <td class="money strong">${money(Number(i.quantidade||0)*Number(i.valor_unitario||0))}</td>
+ </tr>`).join("");
+ const logo=e.logo_url?`<img class="brand-logo" src="${esc(e.logo_url)}">`:`<div class="brand-mark">⚡</div>`;
+ const companyName=esc(e.nome_fantasia||e.razao_social||"Core-Orça");
+ const companyMeta=[
+   e.cnpj?`CNPJ ${esc(e.cnpj)}`:"",
+   e.telefone?esc(e.telefone):"",
+   e.email?esc(e.email):""
+ ].filter(Boolean).join(" • ");
+ const address=esc([e.endereco,e.cidade,e.uf].filter(Boolean).join(" — "));
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
+ <style>
+ @page{size:A4;margin:13mm 14mm 15mm}
+ *{box-sizing:border-box}
+ body{font-family:Arial,Helvetica,sans-serif;color:#172033;font-size:11px;line-height:1.45;margin:0;background:#fff}
+ .doc{max-width:190mm;margin:auto}
+ .top{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;padding-bottom:14px;border-bottom:2px solid #1f4fd6}
+ .brand{display:flex;gap:12px;align-items:center;min-width:0}.brand-logo{max-width:155px;max-height:58px;object-fit:contain}
+ .brand-mark{width:42px;height:42px;border-radius:10px;background:#1f4fd6;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px}
+ .company h1{font-size:17px;margin:0 0 3px;color:#101828}.company p{margin:2px 0;color:#667085;font-size:9.5px}
+ .doc-title{text-align:right}.doc-title .type{text-transform:uppercase;letter-spacing:1.3px;color:#667085;font-size:9px;font-weight:700}
+ .doc-title h2{margin:3px 0 0;font-size:19px;color:#1f4fd6}
+ .info{margin:16px 0 12px;padding:12px 14px;background:#f7f9fc;border:1px solid #e4e9f2;border-radius:9px}
+ .info p{display:inline-block;vertical-align:top;width:48%;margin:3px 1% 3px 0}.info b{color:#344054}
+ table{width:100%;border-collapse:separate;border-spacing:0;margin-top:10px;border:1px solid #e4e9f2;border-radius:8px;overflow:hidden}
+ th{background:#f2f5fa;color:#344054;text-transform:uppercase;letter-spacing:.35px;font-size:8.5px;padding:8px 9px;text-align:left}
+ td{padding:8px 9px;border-top:1px solid #edf0f5;vertical-align:top}.desc{width:46%}.num{text-align:center}.money{text-align:right;white-space:nowrap}.strong{font-weight:700}
+ .pill{font-size:8px;text-transform:uppercase;color:#475467}
+ .total{margin:14px 0 4px;text-align:right;font-size:18px;font-weight:800;color:#101828}
+ .muted{color:#667085}.section{margin-top:18px}.section-title{font-size:10px;text-transform:uppercase;letter-spacing:.7px;color:#475467;font-weight:700;border-bottom:1px solid #e4e9f2;padding-bottom:5px}
+ .signature-box{margin-top:22px;border-top:1px solid #d0d5dd;padding-top:10px;display:flex;gap:20px;align-items:flex-end}
+ .signature-image{display:block;max-width:260px;max-height:85px;object-fit:contain;margin:0 auto 3px}
+ .signature-person{min-width:280px;text-align:center}.signature-line{border-top:1px solid #667085;padding-top:5px;margin-top:3px}
+ .footer{margin-top:24px;padding-top:8px;border-top:1px solid #e4e9f2;color:#98a2b3;font-size:8.5px;display:flex;justify-content:space-between;gap:15px}
+ h3{font-size:11px;margin:16px 0 5px;color:#344054}
+ @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+ </style></head><body><div class="doc">
+ <div class="top"><div class="brand">${logo}<div class="company"><h1>${companyName}</h1>${e.razao_social&&e.razao_social!==e.nome_fantasia?`<p>${esc(e.razao_social)}</p>`:""}<p>${companyMeta}</p><p>${address}</p></div></div>
+ <div class="doc-title"><div class="type">Documento</div><h2>${esc(title)}</h2></div></div>
+ <div class="info">${header}</div>
+ <table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th style="text-align:right">Unitário</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Sem itens.</td></tr>'}</tbody></table>
+ ${notes||""}
+ <div class="footer"><span>${esc(e.rodape_documentos||"Documento emitido pelo Core-Orça")}</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
+ </div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+ w.document.close();
 }
+
 async function printOrcamento(id){
  const o=orcamentos.find(x=>x.id===id);const {data,error}=await sb.from("orcamento_itens").select("*").eq("orcamento_id",id).order("ordem");if(error)return toast(error.message);
  printDocument(`Orçamento ${o.numero}`,`<p><b>Cliente:</b> ${esc(o.clientes?.nome||"-")}</p><p><b>Data:</b> ${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</p><p><b>Validade:</b> ${o.validade_dias} dias</p>`,data||[],`<p class="total">Total: ${money(o.total)}</p><p class="muted">${esc(o.observacoes||"")}</p>`);
 }
 async function printOS(id){
- const o=ordens.find(x=>x.id===id);const {data,error}=await sb.from("ordem_servico_itens").select("*").eq("ordem_servico_id",id).order("ordem");if(error)return toast(error.message);
- printDocument(`Ordem de Serviço ${o.numero}`,`<p><b>Cliente:</b> ${esc(o.clientes?.nome||"-")}</p><p><b>Status:</b> ${esc(statusLabel(o.status))}</p><p><b>Responsável:</b> ${esc(o.responsavel||"-")}</p><p><b>Local:</b> ${esc(o.local_servico||"-")}</p><p><b>Solicitação:</b> ${esc(o.descricao_problema||"-")}</p>`,data||[],`<p class="total">Total: ${money(o.total)}</p><p><b>Assinatura:</b> ${esc(o.assinatura_nome||"Não registrada")}</p>`);
+ const o=ordens.find(x=>x.id===id);
+ const {data,error}=await sb.from("ordem_servico_itens").select("*").eq("ordem_servico_id",id).order("ordem");
+ if(error)return toast(error.message);
+ const assinatura=o.assinatura_data_url?`<div class="section"><div class="section-title">Aceite e assinatura do cliente</div>
+ <div class="signature-box"><div class="signature-person"><img class="signature-image" src="${o.assinatura_data_url}">
+ <div class="signature-line"><b>${esc(o.assinatura_nome||o.clientes?.nome||"Cliente")}</b>${o.assinatura_em?`<br><span class="muted">${new Date(o.assinatura_em).toLocaleString("pt-BR")}</span>`:""}</div></div></div></div>`
+ :`<div class="section"><div class="section-title">Aceite e assinatura do cliente</div><p class="muted">Assinatura ainda não registrada.</p></div>`;
+ printDocument(`Ordem de Serviço ${o.numero}`,
+ `<p><b>Cliente:</b> ${esc(o.clientes?.nome||"-")}</p><p><b>Status:</b> ${esc(statusLabel(o.status))}</p>
+  <p><b>Responsável:</b> ${esc(o.responsavel||"-")}</p><p><b>Local:</b> ${esc(o.local_servico||"-")}</p>
+  <p style="width:98%"><b>Solicitação:</b> ${esc(o.descricao_problema||"-")}</p>`,
+ data||[],`<p class="total">Total: ${money(o.total)}</p>${assinatura}`);
 }
 
 function openModal(title,body){$("modal-title").textContent=title;$("modal-body").innerHTML=body;$("modal").classList.remove("hidden")}

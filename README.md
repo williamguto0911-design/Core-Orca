@@ -1,31 +1,50 @@
-# Core-Orça V15.7
+# Core-Orça V15.8
 
-## Correções
+## Novidades
 
-### Clientes isolados por empresa
-A V15.7 remove todas as policies antigas de `public.clientes` e recria regras estritas por `empresa_id`.
+### Usuários criados pelo Gerente
+Ao cadastrar um novo usuário em **Usuários e Permissões**, o Gerente agora chama a Edge Function `core-orca-admin-users`.
 
-Além do RLS:
-- o frontend filtra explicitamente clientes pela empresa logada;
-- novos clientes recebem o `empresa_id` da sessão;
-- edição/exclusão também exigem a empresa atual;
-- um trigger impede alterar o cliente de uma empresa para outra;
-- o Administrador da Plataforma não recebe acesso aos clientes operacionais.
+A função:
+- valida que o solicitante é Gerente da mesma empresa;
+- respeita o limite de licenças;
+- cria o usuário no Supabase Auth;
+- gera senha temporária aleatória;
+- marca `deve_trocar_senha=true`;
+- cadastra o vínculo na empresa;
+- devolve a senha temporária uma única vez.
 
-### Catálogo Base somente sob demanda
-Os 1.311 materiais continuam em `catalogo_materiais_base`, mas não são copiados automaticamente para `materiais`.
+O fluxo de primeiro acesso já existente força a troca da senha.
 
-A cópia só ocorre quando o usuário usa:
-- seleção manual no **Catálogo Core-Orça**; ou
-- **Importar catálogo completo**.
+### Assinatura na OS
+O PDF/Impressão da OS agora inclui a imagem real da assinatura armazenada em `assinatura_data_url`, nome do cliente e data/hora da assinatura.
 
-Criar empresa, gerente ou licença não executa importação do catálogo nesta versão.
+### Documentos
+O layout comum de Orçamento, OS e Recibo foi redesenhado para A4:
+- cabeçalho empresarial mais limpo;
+- logo e dados da empresa;
+- hierarquia visual do documento;
+- tabela profissional;
+- totais destacados;
+- rodapé e data de emissão;
+- área de assinatura na OS.
 
 ## Instalação
-1. Execute `supabase-v15.7.sql` no SQL Editor.
-2. Substitua `app.js` no GitHub.
-3. Commit, aguarde o Pages e pressione Ctrl+F5.
-4. Saia e entre novamente.
-5. Teste com duas empresas diferentes: um cliente criado na Empresa A não deve aparecer na Empresa B.
 
-Não é necessário alterar a Edge Function.
+### GitHub Pages
+Substitua somente `app.js`.
+
+### Supabase Edge Function
+Atualize/republique a função existente `core-orca-admin-users` usando:
+`supabase/functions/core-orca-admin-users/index.ts`
+
+A função precisa das variáveis padrão:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Não coloque a Service Role no frontend.
+
+O `config.toml` incluído é para uso no projeto Supabase CLI; não deve ser publicado no GitHub Pages.
+
+Não há SQL novo nesta versão.

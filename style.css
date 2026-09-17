@@ -207,3 +207,7 @@
 
 /* V16.0 */
 .photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:12px 0}.photo-card{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff}.photo-card img{width:100%;height:130px;object-fit:cover}.photo-card>div{padding:8px}.action-btn.danger{color:#b42318;border-color:#fecdca}
+
+/* V16.2 — ações de exclusão */
+.action-btn.danger{background:#fff!important;color:#b42318!important;border:1px solid #f04438!important;font-weight:600!important;min-width:58px!important;text-align:center!important}
+.action-btn.danger:hover{background:#fff1f0!important;color:#912018!important}

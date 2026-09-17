@@ -687,6 +687,7 @@ function printDocument(title,header,items,notes,options={}){
  .signature-box{margin-top:22px;border-top:1px solid #d0d5dd;padding-top:10px;display:flex;gap:20px;align-items:flex-end}
  .signature-image{display:block;max-width:260px;max-height:85px;object-fit:contain;margin:0 auto 3px}
  .signature-person{min-width:280px;text-align:center}.signature-line{border-top:1px solid #667085;padding-top:5px;margin-top:3px}
+ .photo-section{break-inside:auto}.pdf-photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:10px}.pdf-photo{margin:0;border:1px solid #e4e9f2;border-radius:8px;padding:6px;break-inside:avoid;background:#fff}.pdf-photo img{display:block;width:100%;height:62mm;object-fit:contain;background:#f7f9fc;border-radius:5px}.pdf-photo figcaption{padding:5px 2px 1px;color:#667085;font-size:8.5px;text-align:center}
  .footer{margin-top:24px;padding-top:8px;border-top:1px solid #e4e9f2;color:#98a2b3;font-size:8.5px;display:flex;justify-content:space-between;gap:15px}
  h3{font-size:11px;margin:16px 0 5px;color:#344054}
  @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -697,7 +698,9 @@ function printDocument(title,header,items,notes,options={}){
  <table><thead><tr><th>Tipo</th><th>Descrição</th><th>Qtd.</th><th style="text-align:right">Unitário</th><th style="text-align:right">Total</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Sem itens.</td></tr>'}</tbody></table>
  ${notes||""}
  <div class="footer"><span>${esc(e.rodape_documentos||"Documento emitido pelo Core-Orça")}</span><span>Emitido em ${new Date().toLocaleString("pt-BR")}</span></div>
- </div><script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+ </div><script>
+ window.onload=()=>{const imgs=[...document.images];Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve}))).then(()=>setTimeout(()=>window.print(),450))};
+<\/script></body></html>`);
  w.document.close();
 }
 
@@ -706,20 +709,23 @@ async function printOrcamento(id){
  printDocument(`Orçamento ${o.numero}`,`<p><b>Cliente:</b> ${esc(o.clientes?.nome||"-")}</p><p><b>Data:</b> ${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</p><p><b>Validade:</b> ${o.validade_dias} dias</p>`,data||[],`<p class="total">Total: ${money(o.total)}</p><p class="muted">${esc(o.observacoes||"")}</p>`);
 }
 async function printOS(id){
- const o=ordens.find(x=>x.id===id);
- const {data,error}=await sb.from("ordem_servico_itens").select("*").eq("ordem_servico_id",id).order("ordem");
- if(error)return toast(error.message);
+ const o=ordens.find(x=>x.id===id);if(!o)return;
+ const [{data:itens,error},{data:fotos,error:fotoError}]=await Promise.all([
+  sb.from("ordem_servico_itens").select("*").eq("ordem_servico_id",id).order("ordem"),
+  sb.from("os_fotos").select("*").eq("ordem_servico_id",id).order("created_at",{ascending:true})
+ ]);
+ if(error)return toast(error.message);if(fotoError)return toast(fotoError.message);
  const assinatura=o.assinatura_data_url?`<div class="section"><div class="section-title">Aceite e assinatura do cliente</div>
  <div class="signature-box"><div class="signature-person"><img class="signature-image" src="${o.assinatura_data_url}">
  <div class="signature-line"><b>${esc(o.assinatura_nome||o.clientes?.nome||"Cliente")}</b>${o.assinatura_em?`<br><span class="muted">${new Date(o.assinatura_em).toLocaleString("pt-BR")}</span>`:""}</div></div></div></div>`
  :`<div class="section"><div class="section-title">Aceite e assinatura do cliente</div><p class="muted">Assinatura ainda não registrada.</p></div>`;
+ const fotosHTML=(fotos||[]).length?`<div class="section photo-section"><div class="section-title">Registro fotográfico da OS</div><div class="pdf-photo-grid">${(fotos||[]).map((f,n)=>{const {data:u}=sb.storage.from("os-fotos").getPublicUrl(f.storage_path);return `<figure class="pdf-photo"><img src="${u.publicUrl}" alt="Foto ${n+1} da OS"><figcaption>${esc(statusLabel(f.tipo)||"Foto")} ${n+1}</figcaption></figure>`}).join("")}</div></div>`:"";
  printDocument(`Ordem de Serviço ${o.numero}`,
  `<p><b>Cliente:</b> ${esc(o.clientes?.nome||"-")}</p><p><b>Status:</b> ${esc(statusLabel(o.status))}</p>
   <p><b>Responsável:</b> ${esc(o.responsavel||"-")}</p><p><b>Local:</b> ${esc(o.local_servico||"-")}</p>
   <p style="width:98%"><b>Solicitação:</b> ${esc(o.descricao_problema||"-")}</p>`,
- data||[],`<p class="total">Total: ${money(o.total)}</p>${assinatura}`);
+ itens||[],`<p class="total">Total: ${money(o.total)}</p>${fotosHTML}${assinatura}`);
 }
-
 function openModal(title,body){$("modal-title").textContent=title;$("modal-body").innerHTML=body;$("modal").classList.remove("hidden")}
 function closeModal(){$("modal").classList.add("hidden");editorItens=[]}
 

@@ -58,7 +58,14 @@ function renderCurrent(){
   if(currentPage==="cargos")renderCargos();
   if(currentPage==="admin-plataforma")renderSaasAdmin();
 }
-async function loadClientes(){const {data,error}=await sb.from("clientes").select("*").eq("ativo",true).order("nome");if(error)return toast("Clientes: "+error.message);clientes=data||[]}
+async function loadClientes(){
+ const empresaId=currentUserProfile?.empresa_id;
+ if(!empresaId){clientes=[];return}
+ const {data,error}=await sb.from("clientes").select("*")
+   .eq("empresa_id",empresaId).eq("ativo",true).order("nome");
+ if(error)return toast("Clientes: "+error.message);
+ clientes=data||[];
+}
 async function loadMateriais(){
  try{
    let all=[],from=0,pageSize=1000;
@@ -161,11 +168,14 @@ function navigate(page){
   renderCurrent();$("sidebar").classList.remove("open");
 }
 
-/* V15.4 — busca inteligente global */
+/* V15.6 — busca inteligente global: texto + números */
 function searchNormalize(v){
  return String(v??"")
   .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
   .toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+}
+function searchDigits(v){
+ return String(v??"").replace(/\D/g,"");
 }
 function searchFlatten(v,out=[]){
  if(v==null)return out;
@@ -174,15 +184,33 @@ function searchFlatten(v,out=[]){
  out.push(String(v));return out;
 }
 function smartSearch(record,query,extra=[]){
- const q=searchNormalize(query);
- if(!q)return true;
- const source=[...searchFlatten(record),...extra.map(x=>String(x??""))].join(" ");
- const text=searchNormalize(source);
- const compact=text.replace(/\s+/g,"");
- const words=text.split(/\s+/).filter(Boolean);
- return q.split(/\s+/).filter(Boolean).every(term=>{
-   const compactTerm=term.replace(/\s+/g,"");
-   return words.some(w=>w.startsWith(term)||w.includes(term)) || compact.includes(compactTerm);
+ const rawQuery=String(query??"").trim();
+ if(!rawQuery)return true;
+
+ const values=[...searchFlatten(record),...extra.map(x=>String(x??""))];
+ const normalizedText=searchNormalize(values.join(" "));
+ const words=normalizedText.split(/\s+/).filter(Boolean);
+
+ // Uma versão somente numérica de cada campo e também do registro completo.
+ // Isso permite procurar CPF/CNPJ/CEP/telefone/códigos com ou sem máscara.
+ const numericFields=values.map(searchDigits).filter(Boolean);
+ const allDigits=numericFields.join(" ");
+
+ const queryTokens=searchNormalize(rawQuery).split(/\s+/).filter(Boolean);
+
+ return queryTokens.every(term=>{
+   const termDigits=searchDigits(term);
+   const isNumeric=/^\d+$/.test(term);
+
+   if(isNumeric){
+     return numericFields.some(v=>v.includes(termDigits)) || allDigits.includes(termDigits);
+   }
+
+   // Termos alfanuméricos como LM0928 também podem localizar LM-0928.
+   const compactTerm=term.replace(/[^a-z0-9]/g,"");
+   const compactText=normalizedText.replace(/\s+/g,"");
+   return words.some(w=>w.startsWith(term)||w.includes(term))
+       || compactText.includes(compactTerm);
  });
 }
 
@@ -603,10 +631,10 @@ function clienteForm(c={}){
  $("f-tipo").onchange=()=>$("pj-fields").classList.toggle("hidden",$("f-tipo").value!=="PJ");
  $("add-contact").onclick=()=>{contatos.push({nome:"",telefone:"",email:""});drawContacts()};
  drawContacts();
- $("entity-form").onsubmit=async e=>{e.preventDefault();const pj=$("f-tipo").value==="PJ";const obj={tipo_pessoa:$("f-tipo").value,nome:$("f-nome").value.trim(),documento:$("f-documento").value.trim(),telefone:$("f-telefone").value.trim(),celular:$("f-celular").value.trim(),email:$("f-email").value.trim(),email_cobranca:$("f-cobranca").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-endereco").value.trim(),numero:$("f-numero").value.trim(),complemento:$("f-complemento").value.trim(),bairro:$("f-bairro").value.trim(),cidade:$("f-cidade").value.trim(),estado:$("f-estado").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim(),representante_legal_nome:pj?$("f-rep-nome").value.trim():null,representante_legal_cpf:pj?$("f-rep-cpf").value.trim():null,representante_legal_cargo:pj?$("f-rep-cargo").value.trim():null,representante_legal_email:pj?$("f-rep-email").value.trim():null,representante_legal_telefone:pj?$("f-rep-tel").value.trim():null,contatos_json:pj?contatos.filter(x=>x.nome||x.telefone||x.email):[]};const res=c.id?await sb.from("clientes").update(obj).eq("id",c.id):await sb.from("clientes").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();toast("Cliente salvo");await loadClientes();renderClientes();renderDashboard()};
+ $("entity-form").onsubmit=async e=>{e.preventDefault();const pj=$("f-tipo").value==="PJ";const obj={tipo_pessoa:$("f-tipo").value,nome:$("f-nome").value.trim(),documento:$("f-documento").value.trim(),telefone:$("f-telefone").value.trim(),celular:$("f-celular").value.trim(),email:$("f-email").value.trim(),email_cobranca:$("f-cobranca").value.trim(),cep:$("f-cep").value.trim(),endereco:$("f-endereco").value.trim(),numero:$("f-numero").value.trim(),complemento:$("f-complemento").value.trim(),bairro:$("f-bairro").value.trim(),cidade:$("f-cidade").value.trim(),estado:$("f-estado").value.trim().toUpperCase(),observacoes:$("f-obs").value.trim(),representante_legal_nome:pj?$("f-rep-nome").value.trim():null,representante_legal_cpf:pj?$("f-rep-cpf").value.trim():null,representante_legal_cargo:pj?$("f-rep-cargo").value.trim():null,representante_legal_email:pj?$("f-rep-email").value.trim():null,representante_legal_telefone:pj?$("f-rep-tel").value.trim():null,contatos_json:pj?contatos.filter(x=>x.nome||x.telefone||x.email):[],empresa_id:currentUserProfile?.empresa_id};const res=c.id?await sb.from("clientes").update(obj).eq("id",c.id).eq("empresa_id",currentUserProfile?.empresa_id):await sb.from("clientes").insert(obj);if(res.error)return toast("Erro: "+res.error.message);closeModal();toast("Cliente salvo");await loadClientes();renderClientes();renderDashboard()};
 }
 function editCliente(id){const c=clientes.find(x=>x.id===id);if(c)clienteForm(c)}
-async function deleteCliente(id){if(!confirm("Excluir este cliente?"))return;const {error}=await sb.from("clientes").update({ativo:false}).eq("id",id);if(error)return toast("Erro: "+error.message);await loadClientes();renderClientes();renderDashboard()}
+async function deleteCliente(id){if(!confirm("Excluir este cliente?"))return;const {error}=await sb.from("clientes").update({ativo:false}).eq("id",id).eq("empresa_id",currentUserProfile?.empresa_id);if(error)return toast("Erro: "+error.message);await loadClientes();renderClientes();renderDashboard()}
 
 function materialForm(m={}){
  openModal(m.id?"Editar material":"Novo material",`<form id="entity-form"><div class="form-grid">

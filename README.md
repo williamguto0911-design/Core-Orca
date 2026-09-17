@@ -1,50 +1,11 @@
-# Core-Orça V15.8
+# Core-Orça V15.9
 
-## Novidades
-
-### Usuários criados pelo Gerente
-Ao cadastrar um novo usuário em **Usuários e Permissões**, o Gerente agora chama a Edge Function `core-orca-admin-users`.
-
-A função:
-- valida que o solicitante é Gerente da mesma empresa;
-- respeita o limite de licenças;
-- cria o usuário no Supabase Auth;
-- gera senha temporária aleatória;
-- marca `deve_trocar_senha=true`;
-- cadastra o vínculo na empresa;
-- devolve a senha temporária uma única vez.
-
-O fluxo de primeiro acesso já existente força a troca da senha.
-
-### Assinatura na OS
-O PDF/Impressão da OS agora inclui a imagem real da assinatura armazenada em `assinatura_data_url`, nome do cliente e data/hora da assinatura.
-
-### Documentos
-O layout comum de Orçamento, OS e Recibo foi redesenhado para A4:
-- cabeçalho empresarial mais limpo;
-- logo e dados da empresa;
-- hierarquia visual do documento;
-- tabela profissional;
-- totais destacados;
-- rodapé e data de emissão;
-- área de assinatura na OS.
+Corrige a regressão da Edge Function da V15.8 que afetou criação de empresa/Gerente e exclusão de empresa.
 
 ## Instalação
+1. Execute `supabase-v15.9.sql` no SQL Editor.
+2. Republique `core-orca-admin-users` com `supabase/functions/core-orca-admin-users/index.ts`.
+3. Substitua `app.js` no GitHub Pages.
+4. Commit, Ctrl+F5 e novo login.
 
-### GitHub Pages
-Substitua somente `app.js`.
-
-### Supabase Edge Function
-Atualize/republique a função existente `core-orca-admin-users` usando:
-`supabase/functions/core-orca-admin-users/index.ts`
-
-A função precisa das variáveis padrão:
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Não coloque a Service Role no frontend.
-
-O `config.toml` incluído é para uso no projeto Supabase CLI; não deve ser publicado no GitHub Pages.
-
-Não há SQL novo nesta versão.
+A V15.9 também exibe o erro real devolvido pela Edge Function. PDFs profissionais, assinatura gráfica da OS e senha temporária de usuários foram preservados.

@@ -401,7 +401,7 @@ function empresaSaasForm(e={}){
        body:{action:"create-manager",empresa_id:empresaId,email:gerenteEmail,nome:gerenteNome}
      });
      if(fnError||created?.error){
-       return toast("Empresa criada, mas houve erro ao criar o Gerente: "+(created?.error||fnError?.message||"erro desconhecido"));
+       return toast("Empresa criada, mas houve erro ao criar o Gerente: "+await edgeFunctionError(fnError,created));
      }
      closeModal();
      await loadSaasAdmin();renderSaasAdmin();
@@ -410,6 +410,12 @@ function empresaSaasForm(e={}){
    }
    closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Empresa atualizada.");
  };
+}
+
+async function edgeFunctionError(error,data){
+ if(data?.error)return data.error;
+ try{if(error?.context){const body=await error.context.clone().json();return body?.error||body?.message||error?.message||"erro desconhecido"}}catch(_){}
+ return error?.message||"erro desconhecido";
 }
 
 function showTemporaryPassword(email,password){
@@ -485,7 +491,7 @@ async function deleteCompany(id){
  const typed=prompt(`Para confirmar, digite exatamente o nome da empresa:\n${e.nome}`);
  if(typed!==e.nome)return toast("Exclusão cancelada.");
  const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"delete-company",empresa_id:id}});
- if(error||data?.error)return toast("Erro ao excluir: "+(data?.error||error?.message||"erro desconhecido"));
+ if(error||data?.error)return toast("Erro ao excluir: "+await edgeFunctionError(error,data));
  await loadSaasAdmin();renderSaasAdmin();toast("Empresa excluída.");
 }
 
@@ -543,7 +549,7 @@ function usuarioForm(u={}){
    const {data:created,error:fnError}=await sb.functions.invoke("core-orca-admin-users",{
     body:{action:"create-company-user",empresa_id:currentUserProfile?.empresa_id,email,nome,tipo,cargo_id:cargoId,ativo}
    });
-   if(fnError||created?.error)return toast("Erro ao criar usuário: "+(created?.error||fnError?.message||"erro desconhecido"));
+   if(fnError||created?.error)return toast("Erro ao criar usuário: "+await edgeFunctionError(fnError,created));
    closeModal();await loadUsuarios();renderUsuarios();
    showTemporaryPassword(email,created.temporary_password,"Usuário criado");
    return;

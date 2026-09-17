@@ -204,3 +204,6 @@
 .searchable-empty{padding:10px;color:#6b7280}
 
 .catalog-check-list{max-height:420px;overflow:auto;border:1px solid #e5e7eb;border-radius:10px;margin:10px 0}.catalog-check{display:flex;gap:10px;padding:10px 12px;border-bottom:1px solid #eef2f7;cursor:pointer}.catalog-check span{display:flex;flex-direction:column}.catalog-check small{color:#6b7280}.catalog-actions{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+
+/* V16.0 */
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin:12px 0}.photo-card{border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;background:#fff}.photo-card img{width:100%;height:130px;object-fit:cover}.photo-card>div{padding:8px}.action-btn.danger{color:#b42318;border-color:#fecdca}

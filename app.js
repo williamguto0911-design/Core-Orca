@@ -149,7 +149,13 @@ function applyPermissions(){
  const noAccess=!platform && (!currentUserProfile?.empresa_id || currentUserProfile?.tipo==="sem_acesso");
 
  document.querySelectorAll(".platform-only").forEach(el=>el.classList.toggle("hidden",!platform));
- document.querySelectorAll(".manager-only").forEach(el=>el.classList.toggle("hidden",platform||!manager));
+ // V036.1: permissões de gerente devem controlar apenas elementos de acesso/ação.
+ // Nunca remova a classe hidden de uma seção .page aqui, pois a navegação é
+ // responsável por manter somente a página atual visível.
+ document.querySelectorAll(".manager-only:not(.page)").forEach(el=>el.classList.toggle("hidden",platform||!manager));
+ document.querySelectorAll(".page.manager-only").forEach(el=>{
+   if(platform||!manager||el.id!=="page-"+currentPage)el.classList.add("hidden");
+ });
 
  document.querySelectorAll("[data-module]").forEach(el=>{
    const allowed=!platform && !noAccess && (manager || can(el.dataset.module,"read"));

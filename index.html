@@ -27,6 +27,7 @@
         <button class="nav-item active" data-page="dashboard">Dashboard</button>
         <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
         <button class="nav-item" data-page="materiais" data-module="materiais">Materiais</button>
+        <button class="nav-item" data-page="lista-materiais" data-module="materiais">Lista de Materiais</button>
         <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
         <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
         <button class="nav-item" data-page="orcamentos" data-module="orcamentos">Orçamentos</button>
@@ -100,6 +101,14 @@
           <button id="novo-material" class="btn primary">+ Material</button>
         </div>
         <div class="table-wrap"><table><thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>UN</th><th>Estoque</th><th>Custo</th><th>Venda</th><th>Lucro</th><th>Margem</th><th></th></tr></thead><tbody id="materiais-table"></tbody></table></div>
+      </section>
+
+      <section id="page-lista-materiais" class="page hidden">
+        <div class="toolbar">
+          <input id="lista-material-search" placeholder="Pesquisar lista, cliente ou vínculo...">
+          <button id="nova-lista-material" class="btn primary">+ Lista de Materiais</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Data</th><th>Cliente</th><th>Vínculo</th><th>Itens</th><th>Total</th><th></th></tr></thead><tbody id="listas-materiais-table"></tbody></table></div>
       </section>
 
       <section id="page-servicos" class="page hidden">

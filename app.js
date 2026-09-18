@@ -3,8 +3,9 @@ const SUPABASE_URL = "https://vihhktumvtfdcnthekic.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaGhrdHVtdnRmZGNudGhla2ljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk1NjY5NTksImV4cCI6MjEwNTE0Mjk1OX0.F6dsoPwigniSvr6CwA8S91tr7KAH-utME0uAwr4etpo";
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], fornecedores=[], compras=[], usuarios=[], recibos=[], cargos=[], empresasSaas=[], empresa=null, currentUserProfile=null, currentSession=null, currentPage="dashboard";
+let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], fornecedores=[], compras=[], usuarios=[], recibos=[], listasMateriais=[], cargos=[], empresasSaas=[], empresa=null, currentUserProfile=null, currentSession=null, currentPage="dashboard";
 let editorItens=[];
+let listaMaterialItens=[];
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
@@ -36,12 +37,13 @@ async function refreshAll(){
     navigate("admin-plataforma");
     return;
   }
-  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa(),loadRecibos(),loadCargos()]);
+  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa(),loadRecibos(),loadListasMateriais(),loadCargos()]);
   applyPermissions();renderDashboard();renderCurrent();
 }
 function renderCurrent(){
   if(currentPage==="clientes")renderClientes();
   if(currentPage==="materiais")renderMateriais();
+  if(currentPage==="lista-materiais")renderListasMateriais();
   if(currentPage==="servicos")renderServicos();
   if(currentPage==="estoque")renderEstoque();
   if(currentPage==="orcamentos")renderOrcamentos();
@@ -105,6 +107,7 @@ async function loadFornecedores(){const {data,error}=await sb.from("fornecedores
 async function loadCompras(){const {data,error}=await sb.from("compras").select("*,fornecedores(nome)").order("created_at",{ascending:false});if(error){compras=[];return}compras=data||[]}
 async function loadUsuarios(){const {data,error}=await sb.from("empresa_usuarios").select("*,cargos(nome)").order("nome");if(error){usuarios=[];return}usuarios=data||[]}
 async function loadRecibos(){const {data,error}=await sb.from("recibos").select("*,clientes(nome)").order("created_at",{ascending:false});if(error){recibos=[];return}recibos=data||[]}
+async function loadListasMateriais(){const {data,error}=await sb.from("listas_materiais").select("*,clientes(nome),orcamentos(numero),recibos(numero),lista_materiais_itens(id)").order("created_at",{ascending:false});if(error){listasMateriais=[];console.warn("Listas de materiais:",error.message);return}listasMateriais=data||[]}
 async function loadCargos(){const {data,error}=await sb.from("cargos").select("*").order("nome");if(error){cargos=[];return}cargos=data||[]}
 async function loadSaasAdmin(){const {data,error}=await sb.rpc("admin_list_empresas");if(error){empresasSaas=[];return}empresasSaas=data||[]}
 function can(module,action="read"){
@@ -164,7 +167,7 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 
@@ -226,6 +229,14 @@ function renderServicos(){
  const q=$("servico-search").value;const rows=servicos.filter(s=>smartSearch(s,q));
  $("servicos-table").innerHTML=rows.map(s=>`<tr><td>${esc(s.codigo||"-")}</td><td><b>${esc(s.nome)}</b><br><span class="muted">${esc(s.descricao||"")}</span></td><td>${esc(s.categoria||"-")}</td><td>${esc(s.unidade||"SV")}</td><td>${money(s.valor)}</td><td><div class="actions"><button class="action-btn" onclick="editServico('${s.id}')">Editar</button><button class="action-btn" onclick="deleteServico('${s.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum serviço encontrado.</td></tr>`;
 }
+
+function renderListasMateriais(){
+ const q=$("lista-material-search")?.value||"";
+ const rows=listasMateriais.filter(l=>smartSearch(l,q));
+ const tb=$("listas-materiais-table");if(!tb)return;
+ tb.innerHTML=rows.map(l=>{const vinc=l.tipo_vinculo==="orcamento"?`Orçamento ${esc(l.orcamentos?.numero||"")}`:l.tipo_vinculo==="recibo"?`Recibo ${esc(l.recibos?.numero||"")}`:"Sem vínculo";return `<tr><td><b>${esc(l.nome)}</b></td><td>${new Date(l.data_lista+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${esc(l.clientes?.nome||"-")}</td><td>${vinc}</td><td>${l.lista_materiais_itens?.length||0}</td><td>${money(l.total||0)}</td><td><div class="actions"><button class="action-btn" onclick="viewListaMaterial('${l.id}')">Abrir</button><button class="action-btn" onclick="editListaMaterial('${l.id}')">Editar</button><button class="action-btn" onclick="printListaMaterial('${l.id}')">PDF / Imprimir</button><button class="action-btn danger" onclick="deleteListaMaterial('${l.id}')">Excluir</button></div></td></tr>`}).join("")||`<tr><td colspan="7">Nenhuma lista de materiais encontrada.</td></tr>`;
+}
+
 function renderEstoque(){
  const q=$("estoque-search").value;const rows=materiais.filter(m=>smartSearch(m,q));
  $("estoque-table").innerHTML=rows.map(m=>{const low=Number(m.estoque_atual)<=Number(m.estoque_minimo);return `<tr><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.codigo||"")}</span></td><td>${Number(m.estoque_atual).toLocaleString("pt-BR")} ${esc(m.unidade)}</td><td>${Number(m.estoque_minimo).toLocaleString("pt-BR")}</td><td class="${low?"low":"ok"}">${low?"ESTOQUE BAIXO":"OK"}</td><td>${new Date(m.updated_at).toLocaleString("pt-BR")}</td></tr>`}).join("")||`<tr><td colspan="5">Nenhum material encontrado.</td></tr>`;
@@ -992,13 +1003,54 @@ async function importCSV(file){
 $("login-form").onsubmit=async e=>{e.preventDefault();$("login-error").textContent="";const {error}=await sb.auth.signInWithPassword({email:$("login-email").value.trim(),password:$("login-password").value});if(error)$("login-error").textContent="E-mail ou senha inválidos."};
 $("logout-btn").onclick=async()=>{await sb.auth.signOut();showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
-$("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
+$("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("nova-lista-material").onclick=()=>listaMaterialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();
 $("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
-$("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
+$("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("lista-material-search").oninput=renderListasMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
 $("recibo-search").oninput=renderRecibos;$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
+
+
+/* V26 — Lista de Materiais */
+function listaMaterialForm(lista=null,itens=[]){
+ listaMaterialItens=(itens||[]).map(i=>({material_id:i.material_id,codigo:i.codigo||"",descricao:i.descricao||"",categoria:i.categoria||"",unidade:i.unidade||"un",quantidade:Number(i.quantidade)||1,valor_unitario:Number(i.valor_unitario)||0,observacoes:i.observacoes||""}));
+ const tipo=lista?.tipo_vinculo||"sem_vinculo";
+ openModal(lista?.id?"Editar Lista de Materiais":"Nova Lista de Materiais",`<form id="lista-material-form"><div class="form-grid">
+ <label>Nome da lista*<input id="lm-nome" required value="${esc(lista?.nome||"")}" placeholder="Ex.: Lista de compra - Obra Centro"></label>
+ <label>Data*<input id="lm-data" type="date" required value="${lista?.data_lista||today()}"></label>
+ <label>Vínculo<select id="lm-tipo"><option value="sem_vinculo" ${tipo==="sem_vinculo"?"selected":""}>Sem vínculo</option><option value="orcamento" ${tipo==="orcamento"?"selected":""}>Orçamento</option><option value="recibo" ${tipo==="recibo"?"selected":""}>Recibo</option></select></label>
+ <label>Cliente<select id="lm-cliente"><option value="">Selecione...</option>${clientes.map(c=>`<option value="${c.id}" ${c.id===lista?.cliente_id?"selected":""}>${esc(c.nome)}</option>`).join("")}</select></label>
+ <label id="lm-orc-wrap" class="${tipo!=="orcamento"?"hidden":""}">Orçamento<select id="lm-orc"><option value="">Selecione...</option>${orcamentos.map(o=>`<option value="${o.id}" ${o.id===lista?.orcamento_id?"selected":""}>${esc(o.numero)} — ${esc(o.clientes?.nome||"")}</option>`).join("")}</select></label>
+ <label id="lm-rec-wrap" class="${tipo!=="recibo"?"hidden":""}">Recibo<select id="lm-rec"><option value="">Selecione...</option>${recibos.map(r=>`<option value="${r.id}" ${r.id===lista?.recibo_id?"selected":""}>${esc(r.numero)} — ${esc(r.clientes?.nome||"")}</option>`).join("")}</select></label>
+ <label class="span-2">Observações<textarea id="lm-obs" placeholder="Observações para compra, conferência ou execução...">${esc(lista?.observacoes||"")}</textarea></label></div>
+ <div class="list-material-editor"><h4 class="section-title">Adicionar material</h4><div class="form-grid list-material-add-grid">
+ <label class="span-2">Material cadastrado<select id="lm-material"><option value="">Selecione...</option>${materiais.map(m=>`<option value="${m.id}">${esc(m.codigo||"")} — ${esc(m.nome)} — ${money(m.custo)}</option>`).join("")}</select></label>
+ <label>Quantidade<input id="lm-qtd" type="number" min="0.01" step="0.01" value="1"></label>
+ <label>Observação do item<input id="lm-item-obs" placeholder="Opcional"></label></div>
+ <div class="modal-actions left"><button type="button" id="lm-add" class="btn primary">Adicionar Material</button><button type="button" id="lm-load" class="btn secondary">Carregar materiais do vínculo</button></div>
+ <div class="table-wrap list-material-items"><table><thead><tr><th>Código</th><th>Material</th><th>UN</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th><th>Observação</th><th></th></tr></thead><tbody id="lm-items"></tbody></table></div><div class="list-material-total">Total geral: <strong id="lm-total">R$ 0,00</strong></div></div>
+ <div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar Lista</button></div></form>`);
+ const syncVinculo=()=>{const t=$("lm-tipo").value;$("lm-orc-wrap").classList.toggle("hidden",t!=="orcamento");$("lm-rec-wrap").classList.toggle("hidden",t!=="recibo")};
+ $("lm-tipo").onchange=syncVinculo;
+ $("lm-orc").onchange=()=>{const o=orcamentos.find(x=>x.id===$("lm-orc").value);if(o?.cliente_id)$("lm-cliente").value=o.cliente_id};
+ $("lm-rec").onchange=()=>{const r=recibos.find(x=>x.id===$("lm-rec").value);if(r?.cliente_id)$("lm-cliente").value=r.cliente_id};
+ $("lm-add").onclick=addListaMaterialItem;$("lm-load").onclick=loadListaMateriaisVinculo;
+ $("lista-material-form").onsubmit=e=>saveListaMaterial(e,lista?.id||null);renderListaMaterialItens();enhanceAllSelects($("modal-body"));
+}
+function addListaMaterialItem(){const id=$("lm-material").value,q=Number($("lm-qtd").value);const m=materiais.find(x=>x.id===id);if(!m||q<=0)return toast("Selecione um material e informe a quantidade.");const existing=listaMaterialItens.find(x=>x.material_id===id);if(existing)existing.quantidade+=q;else listaMaterialItens.push({material_id:m.id,codigo:m.codigo||"",descricao:m.nome,categoria:m.categoria||"",unidade:m.unidade||"un",quantidade:q,valor_unitario:Number(m.custo)||0,observacoes:$("lm-item-obs").value.trim()});$("lm-qtd").value=1;$("lm-item-obs").value="";renderListaMaterialItens()}
+function renderListaMaterialItens(){const tb=$("lm-items");if(!tb)return;tb.innerHTML=listaMaterialItens.map((i,n)=>`<tr><td>${esc(i.codigo||"-")}</td><td><b>${esc(i.descricao)}</b><br><small class="muted">${esc(i.categoria||"")}</small></td><td>${esc(i.unidade)}</td><td><input class="lm-inline" type="number" min="0.01" step="0.01" value="${i.quantidade}" oninput="listaMaterialItens[${n}].quantidade=Number(this.value)||0;updateListaMaterialTotal()"></td><td><input class="lm-inline money-input" type="number" min="0" step="0.01" value="${i.valor_unitario}" oninput="listaMaterialItens[${n}].valor_unitario=Number(this.value)||0;updateListaMaterialTotal()"></td><td class="lm-row-total">${money(i.quantidade*i.valor_unitario)}</td><td><input value="${esc(i.observacoes||"")}" oninput="listaMaterialItens[${n}].observacoes=this.value"></td><td><button type="button" class="action-btn danger" onclick="removeListaMaterialItem(${n})">Excluir</button></td></tr>`).join("")||'<tr><td colspan="8">Nenhum material adicionado.</td></tr>';updateListaMaterialTotal()}
+function removeListaMaterialItem(n){listaMaterialItens.splice(n,1);renderListaMaterialItens()}
+function updateListaMaterialTotal(){let total=0;listaMaterialItens.forEach(i=>total+=Number(i.quantidade)*Number(i.valor_unitario));document.querySelectorAll("#lm-items .lm-row-total").forEach((el,n)=>el.textContent=money(Number(listaMaterialItens[n].quantidade)*Number(listaMaterialItens[n].valor_unitario)));if($("lm-total"))$("lm-total").textContent=money(total);return total}
+async function loadListaMateriaisVinculo(){const t=$("lm-tipo").value;let table="",fk="",id="";if(t==="orcamento"){table="orcamento_itens";fk="orcamento_id";id=$("lm-orc").value}else if(t==="recibo"){table="recibo_itens";fk="recibo_id";id=$("lm-rec").value}else return toast("Selecione Orçamento ou Recibo como vínculo.");if(!id)return toast("Selecione o documento vinculado.");const {data,error}=await sb.from(table).select("*").eq(fk,id);if(error)return toast(error.message);const mats=(data||[]).filter(i=>i.material_id||i.tipo==="material");listaMaterialItens=mats.map(i=>{const m=materiais.find(x=>x.id===i.material_id);return {material_id:i.material_id||m?.id||null,codigo:m?.codigo||"",descricao:m?.nome||i.descricao||"Material",categoria:m?.categoria||"",unidade:m?.unidade||"un",quantidade:Number(i.quantidade)||1,valor_unitario:Number(m?.custo??i.valor_unitario)||0,observacoes:""}});renderListaMaterialItens();toast(`${listaMaterialItens.length} material(is) carregado(s).`)}
+async function saveListaMaterial(e,id){e.preventDefault();if(!listaMaterialItens.length)return toast("Adicione pelo menos um material.");const tipo=$("lm-tipo").value;const header={nome:$("lm-nome").value.trim(),data_lista:$("lm-data").value,cliente_id:$("lm-cliente").value||null,tipo_vinculo:tipo,orcamento_id:tipo==="orcamento"?$("lm-orc").value||null:null,recibo_id:tipo==="recibo"?$("lm-rec").value||null:null,observacoes:$("lm-obs").value.trim()||null,total:updateListaMaterialTotal(),updated_at:new Date().toISOString()};let listaId=id;if(id){const r=await sb.from("listas_materiais").update(header).eq("id",id);if(r.error)return toast("Erro: "+r.error.message);const del=await sb.from("lista_materiais_itens").delete().eq("lista_id",id);if(del.error)return toast("Erro nos itens: "+del.error.message)}else{const {data,error}=await sb.from("listas_materiais").insert(header).select().single();if(error)return toast("Erro: "+error.message);listaId=data.id}const payload=listaMaterialItens.map((i,n)=>({lista_id:listaId,material_id:i.material_id||null,codigo:i.codigo||null,descricao:i.descricao,categoria:i.categoria||null,unidade:i.unidade||"un",quantidade:Number(i.quantidade),valor_unitario:Number(i.valor_unitario),observacoes:i.observacoes||null,ordem:n}));const ins=await sb.from("lista_materiais_itens").insert(payload);if(ins.error)return toast("Lista salva, mas houve erro nos itens: "+ins.error.message);closeModal();await loadListasMateriais();renderListasMateriais();toast("Lista de materiais salva com sucesso.")}
+async function getListaMaterial(id){const {data,error}=await sb.from("listas_materiais").select("*,clientes(*),orcamentos(numero),recibos(numero)").eq("id",id).single();if(error){toast(error.message);return null}const r=await sb.from("lista_materiais_itens").select("*").eq("lista_id",id).order("ordem");if(r.error){toast(r.error.message);return null}return {lista:data,itens:r.data||[]}}
+async function editListaMaterial(id){const x=await getListaMaterial(id);if(x)listaMaterialForm(x.lista,x.itens)}
+async function viewListaMaterial(id){const x=await getListaMaterial(id);if(!x)return;const l=x.lista;const vinc=l.tipo_vinculo==="orcamento"?`Orçamento ${esc(l.orcamentos?.numero||"")}`:l.tipo_vinculo==="recibo"?`Recibo ${esc(l.recibos?.numero||"")}`:"Sem vínculo";openModal(l.nome,`<div class="form-grid"><p><b>Data:</b> ${new Date(l.data_lista+"T12:00:00").toLocaleDateString("pt-BR")}</p><p><b>Cliente:</b> ${esc(l.clientes?.nome||"-")}</p><p><b>Vínculo:</b> ${vinc}</p><p><b>Total:</b> ${money(l.total)}</p></div><p>${esc(l.observacoes||"")}</p><div class="table-wrap"><table><thead><tr><th>Código</th><th>Material</th><th>UN</th><th>Qtd.</th><th>Custo unit.</th><th>Total</th><th>Observação</th></tr></thead><tbody>${x.itens.map(i=>`<tr><td>${esc(i.codigo||"-")}</td><td>${esc(i.descricao)}</td><td>${esc(i.unidade)}</td><td>${Number(i.quantidade).toLocaleString("pt-BR")}</td><td>${money(i.valor_unitario)}</td><td>${money(i.quantidade*i.valor_unitario)}</td><td>${esc(i.observacoes||"")}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn primary" onclick="printListaMaterial('${id}')">PDF / Imprimir</button></div>`)}
+async function printListaMaterial(id){const x=await getListaMaterial(id);if(!x)return;const l=x.lista;const vinc=l.tipo_vinculo==="orcamento"?`Orçamento ${l.orcamentos?.numero||""}`:l.tipo_vinculo==="recibo"?`Recibo ${l.recibos?.numero||""}`:"Sem vínculo";const itens=x.itens.map(i=>({tipo:"material",descricao:`${i.codigo?i.codigo+" — ":""}${i.descricao}${i.observacoes?" — "+i.observacoes:""}`,quantidade:i.quantidade,valor_unitario:i.valor_unitario}));printDocument(`Lista de Materiais — ${l.nome}`,`<p><b>Cliente:</b> ${esc(l.clientes?.nome||"-")}</p><p><b>Data:</b> ${new Date(l.data_lista+"T12:00:00").toLocaleDateString("pt-BR")}</p><p><b>Vínculo:</b> ${esc(vinc)}</p><p><b>Itens:</b> ${x.itens.length}</p>`,itens,`<p class="total">Total geral: ${money(l.total)}</p>${l.observacoes?`<div class="section"><div class="section-title">Observações</div><p>${esc(l.observacoes)}</p></div>`:""}`)}
+async function deleteListaMaterial(id){const l=listasMateriais.find(x=>x.id===id);if(!l||!confirm(`Excluir a lista ${l.nome}?`))return;const {error}=await sb.from("listas_materiais").delete().eq("id",id);if(error)return toast(error.message);await loadListasMateriais();renderListasMateriais();toast("Lista de materiais excluída.")}
+
+
 init();
 
 

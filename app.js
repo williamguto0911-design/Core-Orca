@@ -646,7 +646,7 @@ async function confirmCompra(id){if(!confirm("Confirmar compra? Isso dará entra
 
 function renderUsuarios(){
  const q=$("usuario-search").value, rows=usuarios.filter(u=>smartSearch(u,q));
- $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
+ $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><div class="actions"><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button>${currentUserProfile?.tipo==="gerente"?`<button class="action-btn" onclick="deleteUsuario('${u.id}')">Excluir</button>`:""}</div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
 }
 function usuarioForm(u={}){
  const creating=!u.id;
@@ -671,7 +671,7 @@ function usuarioForm(u={}){
 
   if(creating){
    const {data:created,error:fnError}=await sb.functions.invoke("core-orca-admin-users",{
-    body:{action:"create-company-user",empresa_id:currentUserProfile?.empresa_id,email,nome,tipo,cargo_id:cargoId,ativo}
+    body:{action:"create-company-user",email,nome,tipo,cargo_id:cargoId,ativo}
    });
    if(fnError||created?.error)return toast("Erro ao criar usuário: "+await edgeFunctionError(fnError,created));
    closeModal();await loadUsuarios();renderUsuarios();
@@ -686,6 +686,14 @@ function usuarioForm(u={}){
 }
 
 function editUsuario(id){const u=usuarios.find(x=>x.id===id);if(u)usuarioForm(u)}
+async function deleteUsuario(id){
+ const u=usuarios.find(x=>x.id===id);if(!u)return;
+ if(currentUserProfile?.tipo!=="gerente")return toast("Somente o gerente pode excluir usuários.");
+ if(!confirm(`Excluir o usuário ${u.nome||u.email}? O acesso dele será removido e a licença será liberada.`))return;
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"delete-company-user",usuario_id:id}});
+ if(error||data?.error)return toast("Erro ao excluir usuário: "+await edgeFunctionError(error,data));
+ await loadUsuarios();renderUsuarios();toast("Usuário excluído e licença liberada");
+}
 
 async function duplicateOrcamento(id){
  const o=orcamentos.find(x=>x.id===id);const {data:itens,error}=await sb.from("orcamento_itens").select("*").eq("orcamento_id",id).order("ordem");if(error)return toast(error.message);

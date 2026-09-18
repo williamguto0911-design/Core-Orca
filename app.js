@@ -95,13 +95,32 @@ async function loadTecnicos(){const {data,error}=await sb.from("tecnicos").selec
 async function loadEmpresa(){const {data,error}=await sb.from("empresa_config").select("*").limit(1).maybeSingle();if(error){empresa=null;return}empresa=data||null}
 
 async function loadCurrentProfile(user){
- const {data,error}=await sb.rpc("core_orca_context");
- if(error){
-   console.error("Erro ao carregar contexto do usuário:",error);
-   currentUserProfile={email:user.email,is_platform_admin:false,tipo:"sem_acesso",permissions:{},context_error:error.message};
-   return;
- }
- currentUserProfile=data||{email:user.email,is_platform_admin:false,tipo:"sem_acesso",permissions:{}};
+ // V034: usa a estrutura real de empresa_usuarios (auth_user_id / tipo).
+ // Mantém o RPC para o Administrador da Plataforma e usa consulta direta como
+ // fallback para usuários de empresa, evitando a dependência da antiga V9.
+ let rpcData=null,rpcError=null;
+ try{
+   const r=await sb.rpc("core_orca_context");
+   rpcData=r.data;rpcError=r.error;
+ }catch(e){rpcError=e}
+ if(rpcData?.is_platform_admin){currentUserProfile=rpcData;return}
+ try{
+   const {data:vinculo,error}=await sb.from("empresa_usuarios")
+     .select("id,empresa_id,nome,email,tipo,cargo_id,ativo,deve_trocar_senha,cargos(nome,permissoes)")
+     .eq("auth_user_id",user.id).eq("ativo",true).limit(1).maybeSingle();
+   if(error)throw error;
+   if(vinculo){
+     currentUserProfile={
+       ...(rpcData||{}),email:user.email,nome:vinculo.nome,empresa_id:vinculo.empresa_id,
+       usuario_empresa_id:vinculo.id,tipo:vinculo.tipo||"colaborador",cargo_id:vinculo.cargo_id||null,
+       permissions:vinculo.cargos?.permissoes||rpcData?.permissions||{},
+       deve_trocar_senha:!!vinculo.deve_trocar_senha,is_platform_admin:false
+     };
+     return;
+   }
+ }catch(error){console.error("Erro ao carregar vínculo direto do usuário:",error)}
+ console.error("Contexto/vínculo não encontrado:",rpcError||rpcData);
+ currentUserProfile={email:user.email,is_platform_admin:false,tipo:"sem_acesso",permissions:{},context_error:rpcError?.message||"Vínculo ativo não encontrado"};
 }
 async function loadFornecedores(){const {data,error}=await sb.from("fornecedores").select("*").eq("ativo",true).order("nome");if(error){fornecedores=[];return}fornecedores=data||[]}
 async function loadCompras(){const {data,error}=await sb.from("compras").select("*,fornecedores(nome)").order("created_at",{ascending:false});if(error){compras=[];return}compras=data||[]}
@@ -139,7 +158,7 @@ function applyPermissions(){
 
  if(noAccess){
    console.warn("Usuário autenticado sem vínculo ativo com empresa:",currentUserProfile);
-   setTimeout(()=>toast("Seu login não possui vínculo ativo com uma empresa. Execute a correção V9 no Supabase."),250);
+   setTimeout(()=>toast("Seu login não possui vínculo ativo com uma empresa. Verifique o cadastro do usuário em Gerenciar Usuários."),250);
  }
 }
 
@@ -149,7 +168,7 @@ function applyPermissions(){
 function renderDashboard(){
  if(currentUserProfile?.tipo==="sem_acesso"){
    const alertBox=$("dashboard-alerts");
-   if(alertBox)alertBox.innerHTML='<div class="alert-item danger"><strong>Acesso da empresa não configurado</strong><span>Seu usuário está autenticado, mas ainda não está vinculado como Gerente ou Colaborador de uma empresa. Execute o arquivo supabase-v9.sql.</span></div>';
+   if(alertBox)alertBox.innerHTML='<div class="alert-item danger"><strong>Acesso da empresa não configurado</strong><span>Seu usuário está autenticado, mas não foi encontrado um vínculo ativo com uma empresa.</span></div>';
  }
   $("stat-clientes").textContent=clientes.length;
   $("stat-materiais").textContent=materiais.length;

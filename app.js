@@ -827,7 +827,7 @@ async function addOSTimeline(osId,tipo,descricao){
 }
 async function loadOSTimeline(osId){const {data}=await sb.from("os_historico").select("*").eq("ordem_servico_id",osId).order("created_at",{ascending:false});return data||[]}
 function companyHeader(){
- const e=empresa||{};return `${e.logo_url?`<img src="${esc(e.logo_url)}" style="max-width:180px;max-height:70px;object-fit:contain">`:""}<h1>${esc(e.nome_fantasia||"Core-Orca")}</h1>${e.razao_social?`<p>${esc(e.razao_social)}</p>`:""}${e.cnpj?`<p>CNPJ: ${esc(e.cnpj)}</p>`:""}<p>${esc([e.telefone,e.email].filter(Boolean).join(" | "))}</p><p>${esc([e.endereco,e.cidade,e.uf].filter(Boolean).join(" - "))}</p>`;
+ const e=empresa||{};return `${e.logo_url?`<img src="${esc(e.logo_url)}" style="max-width:180px;max-height:70px;object-fit:contain">`:""}<h1>${esc(e.nome_fantasia||"Core Orça")}</h1>${e.razao_social?`<p>${esc(e.razao_social)}</p>`:""}${e.cnpj?`<p>CNPJ: ${esc(e.cnpj)}</p>`:""}<p>${esc([e.telefone,e.email].filter(Boolean).join(" | "))}</p><p>${esc([e.endereco,e.cidade,e.uf].filter(Boolean).join(" - "))}</p>`;
 }
 
 async function uploadOSPhoto(osId,file,tipo){

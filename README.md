@@ -1,21 +1,35 @@
-# Core Orça — V038
+# Core Orça — V039
 
-## Padronização da marca
+## Sessão única por usuário
 
-Esta versão corrige o nome exibido do sistema de **Core Orca / Core-Orca** para **Core Orça**.
+A V039 adiciona bloqueio de acesso simultâneo da mesma conta em locais diferentes.
 
-A alteração foi aplicada aos textos visíveis do sistema, incluindo:
-- título da página;
-- tela de login;
-- identificação no menu lateral;
-- nome padrão exibido nos documentos quando a empresa não possui nome fantasia configurado.
+### Comportamento
+- O primeiro dispositivo/navegador que entrar registra a sessão ativa do usuário.
+- Uma nova tentativa com a mesma conta em outro dispositivo/navegador é recusada com mensagem de usuário já conectado.
+- Não existe expiração por tempo de inatividade.
+- Ao clicar em **Sair**, a sessão é liberada imediatamente.
+- Ao fechar e reabrir o mesmo navegador, o identificador local permite retomar a mesma sessão sem criar uma segunda sessão.
+- Se o navegador/dispositivo original for perdido ou tiver os dados locais apagados sem logout, o administrador deverá liberar manualmente a sessão no banco.
 
-Os identificadores técnicos que podem afetar integrações foram preservados, como o nome da Edge Function `core-orca-admin-users` e nomes de arquivos SQL já existentes.
+### Instalação
+1. Execute `supabase-v039-sessao-unica.sql` no SQL Editor do Supabase.
+2. Substitua `app.js` no repositório pela versão deste pacote.
+3. `index.html` e `style.css` podem ser mantidos/substituídos pelos arquivos do pacote; não houve mudança visual obrigatória neles.
+4. Publique e faça `Ctrl + F5`.
 
-## Atualização
+Não é necessário alterar a Edge Function.
 
-1. Substitua `index.html`, `app.js` e `style.css` pelos arquivos desta versão.
-2. Faça commit no GitHub e aguarde a publicação do GitHub Pages.
-3. Atualize a página com `Ctrl + F5`.
+### Liberação manual de uma sessão presa
+Para liberar uma conta específica, use no SQL Editor:
 
-Não há alteração de banco de dados nesta versão e não é necessário executar SQL nem republicar a Edge Function.
+```sql
+delete from public.usuario_sessoes_ativas
+where auth_user_id = (
+  select id from auth.users
+  where lower(email) = lower('usuario@exemplo.com')
+  limit 1
+);
+```
+
+Isso libera somente o bloqueio de sessão única; não exclui o usuário.

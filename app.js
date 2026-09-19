@@ -6,6 +6,45 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[], financeiro=[], tecnicos=[], fornecedores=[], compras=[], usuarios=[], recibos=[], listasMateriais=[], cargos=[], empresasSaas=[], empresa=null, currentUserProfile=null, currentSession=null, currentPage="dashboard";
 let editorItens=[];
 let listaMaterialItens=[];
+let singleSessionClaimed=false;
+
+function singleSessionStorageKey(userId){return `core_orca_single_session_${userId}`}
+function getOrCreateDeviceSessionToken(userId){
+ let token=localStorage.getItem(singleSessionStorageKey(userId));
+ if(!token){
+   token=(crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`);
+   localStorage.setItem(singleSessionStorageKey(userId),token);
+ }
+ return token;
+}
+async function claimSingleSession(user){
+ if(!user?.id)return {ok:false};
+ const token=getOrCreateDeviceSessionToken(user.id);
+ const {data,error}=await sb.rpc("core_orca_claim_single_session_v039",{p_session_token:token});
+ if(error){console.error("Sessão única:",error);return {ok:false,error}}
+ const result=data||{};
+ if(result.ok===false || result.bloqueada===true)return {ok:false,blocked:true};
+ singleSessionClaimed=true;
+ return {ok:true};
+}
+async function releaseSingleSession(){
+ try{
+   const userId=currentSession?.user?.id;
+   if(!userId)return;
+   const token=localStorage.getItem(singleSessionStorageKey(userId));
+   if(token)await sb.rpc("core_orca_release_single_session_v039",{p_session_token:token});
+   localStorage.removeItem(singleSessionStorageKey(userId));
+ }catch(error){console.error("Liberação da sessão única:",error)}
+ singleSessionClaimed=false;
+}
+async function blockDuplicateLogin(){
+ await sb.auth.signOut({scope:"local"});
+ currentSession=null;
+ showLogin();
+ const box=$("login-error");
+ if(box)box.textContent="Este usuário já está logado em outro local. Não é possível utilizar a mesma conta simultaneamente em dois locais. Encerre a sessão no outro local e tente novamente.";
+}
+
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
@@ -22,6 +61,19 @@ async function init(){
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
 async function showApp(session){
  currentSession=session;
+ if(!singleSessionClaimed){
+   const claim=await claimSingleSession(session.user);
+   if(!claim.ok){
+     if(claim.blocked)await blockDuplicateLogin();
+     else {
+       await sb.auth.signOut({scope:"local"});
+       showLogin();
+       const box=$("login-error");
+       if(box)box.textContent="Não foi possível validar a sessão única. Tente novamente.";
+     }
+     return;
+   }
+ }
  // V037: valida a licença da empresa antes de liberar a aplicação.
  // O administrador da plataforma não é bloqueado por licença de empresa.
  $("app").classList.add("hidden");
@@ -59,6 +111,7 @@ async function validateCompanyLicense(){
    const motivo=lic.expirada
      ? `A licença desta empresa expirou em ${formatLicenseDate(lic.licenca_validade)}.`
      : "A licença desta empresa está bloqueada.";
+   await releaseSingleSession();
    await sb.auth.signOut();
    showLogin();
    const box=$("login-error");
@@ -1213,7 +1266,7 @@ async function importCSV(file){
 }
 
 $("login-form").onsubmit=async e=>{e.preventDefault();$("login-error").textContent="";const {error}=await sb.auth.signInWithPassword({email:$("login-email").value.trim(),password:$("login-password").value});if(error)$("login-error").textContent="E-mail ou senha inválidos."};
-$("logout-btn").onclick=async()=>{await sb.auth.signOut();showLogin()};
+$("logout-btn").onclick=async()=>{await releaseSingleSession();await sb.auth.signOut();currentSession=null;showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("nova-lista-material").onclick=()=>listaMaterialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();

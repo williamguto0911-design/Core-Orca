@@ -22,12 +22,67 @@ async function init(){
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
 async function showApp(session){
  currentSession=session;
- $("login-screen").classList.add("hidden");$("app").classList.remove("hidden");
+ // V037: valida a licença da empresa antes de liberar a aplicação.
+ // O administrador da plataforma não é bloqueado por licença de empresa.
+ $("app").classList.add("hidden");
+ $("login-screen").classList.add("hidden");
  $("user-email").textContent=session.user.email||"";
  await loadCurrentProfile(session.user);
+ if(!currentUserProfile?.is_platform_admin){
+   const licenseOk=await validateCompanyLicense();
+   if(!licenseOk)return;
+ }
+ $("app").classList.remove("hidden");
  if(currentUserProfile?.deve_trocar_senha){forcePasswordChange();return}
  await refreshAll();
+ await showLicenseExpiryNotice();
 }
+
+async function getCompanyLicenseStatus(){
+ try{
+   const {data,error}=await sb.rpc("minha_empresa_licenca_v037");
+   if(error){console.error("Licença da empresa:",error);return null}
+   return data||null;
+ }catch(error){console.error("Licença da empresa:",error);return null}
+}
+
+function formatLicenseDate(value){
+ if(!value)return "";
+ return new Date(String(value).slice(0,10)+"T12:00:00").toLocaleDateString("pt-BR");
+}
+
+async function validateCompanyLicense(){
+ const lic=await getCompanyLicenseStatus();
+ // Falha de consulta não bloqueia o sistema para evitar indisponibilidade por erro de rede/migração.
+ if(!lic)return true;
+ if(lic.expirada || lic.ativa===false){
+   const motivo=lic.expirada
+     ? `A licença desta empresa expirou em ${formatLicenseDate(lic.licenca_validade)}.`
+     : "A licença desta empresa está bloqueada.";
+   await sb.auth.signOut();
+   showLogin();
+   const box=$("login-error");
+   if(box)box.textContent=`${motivo} Entre em contato com o administrador do sistema.`;
+   return false;
+ }
+ return true;
+}
+
+async function showLicenseExpiryNotice(){
+ if(currentUserProfile?.is_platform_admin)return;
+ document.getElementById("license-expiry-notice")?.remove();
+ const lic=await getCompanyLicenseStatus();
+ if(!lic || !lic.licenca_validade || lic.expirada || lic.ativa===false)return;
+ const dias=Number(lic.dias_restantes);
+ if(!Number.isFinite(dias) || dias<0 || dias>10)return;
+ const el=document.createElement("div");
+ el.id="license-expiry-notice";
+ el.className="license-expiry-notice";
+ el.innerHTML=`<button type="button" class="license-notice-close" aria-label="Fechar">×</button><b>Licença próxima do vencimento</b><span>Sua licença irá expirar em <strong>${formatLicenseDate(lic.licenca_validade)}</strong>.</span>`;
+ document.body.appendChild(el);
+ el.querySelector("button").onclick=()=>el.remove();
+}
+
 async function refreshAll(){
   if(!currentSession)return;
   await loadCurrentProfile(currentSession.user);

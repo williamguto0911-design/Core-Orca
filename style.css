@@ -225,3 +225,11 @@
 #page-reposicao-estoque .reposicao-toolbar{justify-content:flex-end;gap:10px}
 #page-reposicao-estoque input[type="checkbox"]{width:18px;height:18px;cursor:pointer}
 #page-reposicao-estoque .reposicao-qtd,#page-reposicao-estoque .reposicao-obs{box-sizing:border-box}
+
+
+/* V039 — filtros empilhados: OS e Reposição de Estoque */
+.filtros-empilhados{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:10px!important;width:100%}
+.filtros-empilhados>input,.filtros-empilhados>select{display:block!important;width:100%!important;max-width:none!important;flex:none!important;min-height:42px}
+.filtros-empilhados>.toolbar-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;width:100%}
+#page-reposicao-estoque .reposicao-toolbar{justify-content:flex-start!important}
+@media(max-width:700px){.filtros-empilhados>.toolbar-actions{justify-content:stretch}.filtros-empilhados>.toolbar-actions .btn{flex:1}}

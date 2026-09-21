@@ -126,11 +126,13 @@
         <div class="page-header">
           <div><h1>Reposição de Estoque</h1><p>Materiais com estoque atual igual ou abaixo do estoque mínimo.</p></div>
         </div>
-        <div class="toolbar reposicao-toolbar">
+        <div class="toolbar reposicao-toolbar filtros-empilhados">
           <input type="search" id="reposicao-search" placeholder="Pesquisar por código, material, fabricante..." autocomplete="off">
           <select id="reposicao-categoria-filter" aria-label="Filtrar por categoria"><option value="">Todas as categorias</option></select>
-          <button type="button" id="reposicao-selecionar-todos" class="btn secondary">Selecionar todos</button>
-          <button type="button" id="reposicao-gerar-pdf" class="btn primary">Gerar PDF</button>
+          <div class="toolbar-actions reposicao-actions">
+            <button type="button" id="reposicao-selecionar-todos" class="btn secondary">Selecionar todos</button>
+            <button type="button" id="reposicao-gerar-pdf" class="btn primary">Gerar PDF</button>
+          </div>
         </div>
         <div class="table-wrap"><table><thead><tr><th style="width:70px">Selecionar</th><th>Código</th><th>Material</th><th>Atual</th><th>Mínimo</th><th style="width:130px">Quantidade</th><th>Observações</th></tr></thead><tbody id="reposicao-estoque-table"></tbody></table></div>
       </section>
@@ -141,7 +143,11 @@
       </section>
 
       <section id="page-os" class="page hidden">
-        <div class="toolbar"><input id="os-search" placeholder="Pesquisar OS ou cliente..."><select id="os-status-filter"><option value="">Todos os status</option><option value="aberta">Aberta</option><option value="em_andamento">Em andamento</option><option value="aguardando_material">Aguardando material</option><option value="concluida">Concluída</option><option value="cancelada">Cancelada</option></select><button id="nova-os" class="btn primary">+ Ordem de Serviço</button></div>
+        <div class="toolbar os-toolbar filtros-empilhados">
+          <input id="os-search" placeholder="Pesquisar OS ou cliente...">
+          <select id="os-status-filter"><option value="">Todos os status</option><option value="aberta">Aberta</option><option value="em_andamento">Em andamento</option><option value="aguardando_material">Aguardando material</option><option value="concluida">Concluída</option><option value="cancelada">Cancelada</option></select>
+          <div class="toolbar-actions"><button id="nova-os" class="btn primary">+ Ordem de Serviço</button></div>
+        </div>
         <div class="table-wrap"><table><thead><tr><th>Nº</th><th>Cliente</th><th>Abertura</th><th>Responsável</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody id="os-table"></tbody></table></div>
       </section>
 

@@ -30,6 +30,7 @@
         <button class="nav-item" data-page="lista-materiais" data-module="materiais">Lista de Materiais</button>
         <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
         <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
+        <button class="nav-item" data-page="reposicao-estoque" data-module="estoque">Reposição de Estoque</button>
         <button class="nav-item" data-page="orcamentos" data-module="orcamentos">Orçamentos</button>
         <button class="nav-item" data-page="os" data-module="os">Ordens de Serviço</button>
         <button class="nav-item" data-page="agenda" data-module="agenda">Agenda</button>
@@ -119,6 +120,17 @@
       <section id="page-estoque" class="page hidden">
         <div class="toolbar"><input id="estoque-search" placeholder="Pesquisar estoque..."><button id="nova-movimentacao" class="btn primary">Movimentar estoque</button></div>
         <div class="table-wrap"><table><thead><tr><th>Material</th><th>Atual</th><th>Mínimo</th><th>Status</th><th>Atualizado</th></tr></thead><tbody id="estoque-table"></tbody></table></div>
+      </section>
+
+      <section id="page-reposicao-estoque" class="page hidden">
+        <div class="page-header">
+          <div><h1>Reposição de Estoque</h1><p>Materiais com estoque atual igual ou abaixo do estoque mínimo.</p></div>
+        </div>
+        <div class="toolbar reposicao-toolbar">
+          <button type="button" id="reposicao-selecionar-todos" class="btn secondary">Selecionar todos</button>
+          <button type="button" id="reposicao-gerar-pdf" class="btn primary">Gerar PDF</button>
+        </div>
+        <div class="table-wrap"><table><thead><tr><th style="width:70px">Selecionar</th><th>Código</th><th>Material</th><th>Atual</th><th>Mínimo</th><th style="width:130px">Quantidade</th><th>Observações</th></tr></thead><tbody id="reposicao-estoque-table"></tbody></table></div>
       </section>
 
       <section id="page-orcamentos" class="page hidden">

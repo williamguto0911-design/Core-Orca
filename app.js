@@ -154,6 +154,7 @@ function renderCurrent(){
   if(currentPage==="lista-materiais")renderListasMateriais();
   if(currentPage==="servicos")renderServicos();
   if(currentPage==="estoque")renderEstoque();
+  if(currentPage==="reposicao-estoque")renderReposicaoEstoque();
   if(currentPage==="orcamentos")renderOrcamentos();
   if(currentPage==="os")renderOS();
   if(currentPage==="agenda")renderAgenda();
@@ -382,6 +383,52 @@ function renderEstoque(){
  const q=$("estoque-search").value;const rows=materiais.filter(m=>smartSearch(m,q));
  $("estoque-table").innerHTML=rows.map(m=>{const low=Number(m.estoque_atual)<=Number(m.estoque_minimo);return `<tr><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.codigo||"")}</span></td><td>${Number(m.estoque_atual).toLocaleString("pt-BR")} ${esc(m.unidade)}</td><td>${Number(m.estoque_minimo).toLocaleString("pt-BR")}</td><td class="${low?"low":"ok"}">${low?"ESTOQUE BAIXO":"OK"}</td><td>${new Date(m.updated_at).toLocaleString("pt-BR")}</td></tr>`}).join("")||`<tr><td colspan="5">Nenhum material encontrado.</td></tr>`;
 }
+function materiaisEstoqueBaixo(){
+ return materiais.filter(m=>Number(m.estoque_atual||0)<=Number(m.estoque_minimo||0));
+}
+function renderReposicaoEstoque(){
+ const tb=$("reposicao-estoque-table");if(!tb)return;
+ const anteriores={};
+ tb.querySelectorAll("tr[data-material-id]").forEach(tr=>{anteriores[tr.dataset.materialId]={selecionado:!!tr.querySelector(".reposicao-check")?.checked,quantidade:tr.querySelector(".reposicao-qtd")?.value||"",observacoes:tr.querySelector(".reposicao-obs")?.value||""}});
+ const rows=materiaisEstoqueBaixo();
+ tb.innerHTML=rows.map(m=>{
+   const prev=anteriores[m.id];
+   const atual=Number(m.estoque_atual||0),min=Number(m.estoque_minimo||0);
+   const sugerida=Math.max(1,min-atual);
+   return `<tr data-material-id="${esc(m.id)}"><td style="text-align:center"><input type="checkbox" class="reposicao-check" ${prev?.selecionado?"checked":""}></td><td>${esc(m.codigo||"-")}</td><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.fabricante||"")}</span></td><td class="low">${atual.toLocaleString("pt-BR")} ${esc(m.unidade||"")}</td><td>${min.toLocaleString("pt-BR")} ${esc(m.unidade||"")}</td><td><input class="reposicao-qtd" type="number" min="0" step="any" value="${esc(prev?.quantidade||sugerida)}" style="min-width:95px;width:100%"></td><td><input class="reposicao-obs" type="text" value="${esc(prev?.observacoes||"")}" placeholder="Observações..." style="min-width:220px;width:100%"></td></tr>`;
+ }).join("")||`<tr><td colspan="7">Nenhum material com estoque baixo.</td></tr>`;
+ atualizarBotaoSelecionarTodosReposicao();
+}
+function atualizarBotaoSelecionarTodosReposicao(){
+ const btn=$("reposicao-selecionar-todos");if(!btn)return;
+ const checks=[...document.querySelectorAll("#reposicao-estoque-table .reposicao-check")];
+ btn.textContent=checks.length&&checks.every(c=>c.checked)?"Desmarcar todos":"Selecionar todos";
+}
+function toggleTodosReposicao(){
+ const checks=[...document.querySelectorAll("#reposicao-estoque-table .reposicao-check")];
+ if(!checks.length)return;
+ const marcar=!checks.every(c=>c.checked);checks.forEach(c=>c.checked=marcar);atualizarBotaoSelecionarTodosReposicao();
+}
+function dadosEmpresaComoClienteHTML(){
+ const e=empresa||{};
+ const nome=e.razao_social||e.nome_fantasia||"Empresa não cadastrada";
+ const endereco=[e.endereco,e.cidade,e.uf].filter(Boolean).join(" - ");
+ return `<div class="section"><div class="section-title">Cliente</div><div class="client-data-grid"><p><b>${esc(nome)}</b></p>${e.nome_fantasia&&e.razao_social?`<p><b>Nome fantasia:</b> ${esc(e.nome_fantasia)}</p>`:""}${e.cnpj?`<p><b>CNPJ:</b> ${esc(e.cnpj)}</p>`:""}${endereco?`<p><b>Endereço:</b> ${esc(endereco)}</p>`:""}${e.telefone?`<p><b>Telefone:</b> ${esc(e.telefone)}</p>`:""}${e.email?`<p><b>E-mail:</b> ${esc(e.email)}</p>`:""}</div></div>`;
+}
+function gerarPDFReposicaoEstoque(){
+ const selecionados=[...document.querySelectorAll("#reposicao-estoque-table tr[data-material-id]")].filter(tr=>tr.querySelector(".reposicao-check")?.checked);
+ if(!selecionados.length)return toast("Selecione ao menos um material para gerar o PDF.");
+ const itens=selecionados.map(tr=>{
+   const m=materiais.find(x=>String(x.id)===String(tr.dataset.materialId));
+   const qtd=Number(tr.querySelector(".reposicao-qtd")?.value||0);
+   const obs=tr.querySelector(".reposicao-obs")?.value?.trim()||"";
+   return {tipo:"material",descricao:`${m?.codigo?m.codigo+" — ":""}${m?.nome||"Material"}${obs?" — Obs.: "+obs:""}`,quantidade:qtd,valor_unitario:0};
+ });
+ const header=`${dadosEmpresaComoClienteHTML()}<p><b>Data:</b> ${new Date().toLocaleDateString("pt-BR")}</p><p><b>Finalidade:</b> Reposição de estoque</p>`;
+ const notes=`<div class="section"><div class="section-title">Controle de estoque</div><p>Lista gerada a partir dos materiais com estoque atual igual ou abaixo do estoque mínimo cadastrado.</p></div>`;
+ printDocument("Reposição de Estoque",header,itens,notes);
+}
+
 function renderOrcamentos(){
  const q=$("orcamento-search").value;const rows=orcamentos.filter(o=>smartSearch(o,q));
  $("orcamentos-table").innerHTML=rows.map(o=>`<tr><td><b>${esc(o.numero)}</b></td><td>${esc(o.clientes?.nome||"-")}</td><td>${new Date(o.data_orcamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td><span class="badge ${esc(o.status)}">${statusLabel(o.status)}</span></td><td>${money(o.total)}</td><td><div class="actions"><button class="action-btn" onclick="viewOrcamento('${o.id}')">Abrir</button><button class="action-btn" onclick="editOrcamento('${o.id}')">Editar</button><button class="action-btn" onclick="duplicateOrcamento('${o.id}')">Duplicar</button><button class="action-btn" onclick="convertOrcamento('${o.id}')">Gerar OS</button><button class="action-btn danger" onclick="deleteOrcamento('${o.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum orçamento encontrado.</td></tr>`;
@@ -1269,6 +1316,9 @@ $("login-form").onsubmit=async e=>{e.preventDefault();$("login-error").textConte
 $("logout-btn").onclick=async()=>{await releaseSingleSession();await sb.auth.signOut();currentSession=null;showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("nova-lista-material").onclick=()=>listaMaterialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
+if($("reposicao-selecionar-todos"))$("reposicao-selecionar-todos").onclick=toggleTodosReposicao;
+if($("reposicao-gerar-pdf"))$("reposicao-gerar-pdf").onclick=gerarPDFReposicaoEstoque;
+if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("change",e=>{if(e.target.classList.contains("reposicao-check"))atualizarBotaoSelecionarTodosReposicao()});
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();
 $("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};

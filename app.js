@@ -309,7 +309,7 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 
@@ -386,13 +386,27 @@ function renderEstoque(){
 function materiaisEstoqueBaixo(){
  return materiais.filter(m=>Number(m.estoque_atual||0)<=Number(m.estoque_minimo||0));
 }
+const reposicaoEstado={};
+function salvarEstadoReposicaoVisivel(){
+ const tb=$("reposicao-estoque-table");if(!tb)return;
+ tb.querySelectorAll("tr[data-material-id]").forEach(tr=>{reposicaoEstado[tr.dataset.materialId]={selecionado:!!tr.querySelector(".reposicao-check")?.checked,quantidade:tr.querySelector(".reposicao-qtd")?.value||"",observacoes:tr.querySelector(".reposicao-obs")?.value||""}});
+}
 function renderReposicaoEstoque(){
  const tb=$("reposicao-estoque-table");if(!tb)return;
- const anteriores={};
- tb.querySelectorAll("tr[data-material-id]").forEach(tr=>{anteriores[tr.dataset.materialId]={selecionado:!!tr.querySelector(".reposicao-check")?.checked,quantidade:tr.querySelector(".reposicao-qtd")?.value||"",observacoes:tr.querySelector(".reposicao-obs")?.value||""}});
- const rows=materiaisEstoqueBaixo();
+ salvarEstadoReposicaoVisivel();
+ const todos=materiaisEstoqueBaixo();
+ const categoriaSel=$("reposicao-categoria-filter");
+ if(categoriaSel){
+   const atual=categoriaSel.value;
+   const categorias=[...new Set(todos.map(m=>String(m.categoria||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR",{sensitivity:"base"}));
+   categoriaSel.innerHTML='<option value="">Todas as categorias</option>'+categorias.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+   if(categorias.includes(atual))categoriaSel.value=atual;
+ }
+ const q=$("reposicao-search")?.value||"";
+ const categoria=$("reposicao-categoria-filter")?.value||"";
+ const rows=todos.filter(m=>smartSearch(m,q)&&(!categoria||String(m.categoria||"")===categoria));
  tb.innerHTML=rows.map(m=>{
-   const prev=anteriores[m.id];
+   const prev=reposicaoEstado[m.id];
    const atual=Number(m.estoque_atual||0),min=Number(m.estoque_minimo||0);
    const sugerida=Math.max(1,min-atual);
    return `<tr data-material-id="${esc(m.id)}"><td style="text-align:center"><input type="checkbox" class="reposicao-check" ${prev?.selecionado?"checked":""}></td><td>${esc(m.codigo||"-")}</td><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.fabricante||"")}</span></td><td class="low">${atual.toLocaleString("pt-BR")} ${esc(m.unidade||"")}</td><td>${min.toLocaleString("pt-BR")} ${esc(m.unidade||"")}</td><td><input class="reposicao-qtd" type="number" min="0" step="any" value="${esc(prev?.quantidade||sugerida)}" style="min-width:95px;width:100%"></td><td><input class="reposicao-obs" type="text" value="${esc(prev?.observacoes||"")}" placeholder="Observações..." style="min-width:220px;width:100%"></td></tr>`;
@@ -1318,7 +1332,10 @@ $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("nova-lista-material").onclick=()=>listaMaterialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
 if($("reposicao-selecionar-todos"))$("reposicao-selecionar-todos").onclick=toggleTodosReposicao;
 if($("reposicao-gerar-pdf"))$("reposicao-gerar-pdf").onclick=gerarPDFReposicaoEstoque;
-if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("change",e=>{if(e.target.classList.contains("reposicao-check"))atualizarBotaoSelecionarTodosReposicao()});
+if($("reposicao-search"))$("reposicao-search").oninput=renderReposicaoEstoque;
+if($("reposicao-categoria-filter"))$("reposicao-categoria-filter").onchange=renderReposicaoEstoque;
+if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("change",e=>{if(e.target.classList.contains("reposicao-check")){salvarEstadoReposicaoVisivel();atualizarBotaoSelecionarTodosReposicao()}});
+if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("input",e=>{if(e.target.classList.contains("reposicao-qtd")||e.target.classList.contains("reposicao-obs"))salvarEstadoReposicaoVisivel()});
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();
 $("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};

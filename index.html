@@ -248,15 +248,25 @@
 
 
       <section id="page-unifilar" class="page hidden">
-        <div class="panel unifilar-panel">
-          <div class="panel-head"><div><h3>Esquema Unifilar</h3><p class="muted">Monte quadros, proteções e circuitos. Arraste os componentes, conecte-os e associe materiais.</p></div><div class="action-group"><button id="unifilar-new" class="btn secondary">Novo</button><button id="unifilar-open" class="btn secondary">Abrir</button><button id="unifilar-save" class="btn primary">Salvar</button><button id="unifilar-pdf" class="btn secondary">PDF</button></div></div>
-          <div class="unifilar-meta"><input id="unifilar-name" placeholder="Nome do esquema"><select id="unifilar-vinculo-tipo"><option value="">Sem vínculo</option><option value="orcamento">Orçamento</option><option value="os">Ordem de Serviço</option><option value="lista_materiais">Lista de Materiais</option></select><select id="unifilar-vinculo-id"><option value="">Selecione...</option></select><button id="unifilar-import-materials" class="btn secondary">Importar materiais do vínculo</button></div>
-          <div class="unifilar-workspace">
-            <aside class="unifilar-palette"><b>Componentes</b><button draggable="true" data-uf-type="entrada">Entrada</button><button draggable="true" data-uf-type="quadro">Quadro</button><button draggable="true" data-uf-type="disjuntor">Disjuntor</button><button draggable="true" data-uf-type="idr">IDR</button><button draggable="true" data-uf-type="dps">DPS</button><button draggable="true" data-uf-type="barramento">Barramento</button><button draggable="true" data-uf-type="circuito">Circuito / Carga</button><button draggable="true" data-uf-type="terra">Terra / PE</button></aside>
-            <div id="unifilar-canvas" class="unifilar-canvas"><svg id="unifilar-lines"></svg><div id="unifilar-nodes"></div></div>
-            <aside id="unifilar-properties" class="unifilar-properties"><b>Propriedades</b><p class="muted">Selecione um componente.</p></aside>
+        <div class="panel unifilar-panel uf-dark">
+          <div class="uf-toolbar">
+            <div><b>Esquema Unifilar</b><span class="uf-standard">Simbologia técnica baseada em IEC 60617</span></div>
+            <div class="action-group"><button id="unifilar-new" class="btn secondary">Novo</button><button id="unifilar-open" class="btn secondary">Abrir</button><button id="unifilar-organize" class="btn secondary">Organizar</button><button id="unifilar-save" class="btn primary">Salvar</button><button id="unifilar-pdf" class="btn secondary">PDF</button></div>
           </div>
-          <div class="unifilar-footer"><span id="unifilar-summary">Potência: 0 W • Corrente calculada: 0 A</span><button id="unifilar-materials" class="btn secondary">Materiais do esquema</button></div>
+          <div class="unifilar-meta"><input id="unifilar-name" placeholder="Nome do esquema"><select id="unifilar-system"><option value="mono">Monofásico</option><option value="bi">Bifásico</option><option value="tri">Trifásico</option></select><select id="unifilar-vinculo-tipo"><option value="">Sem vínculo</option><option value="orcamento">Orçamento</option><option value="os">Ordem de Serviço</option><option value="lista_materiais">Lista de Materiais</option></select><select id="unifilar-vinculo-id"><option value="">Selecione...</option></select><button id="unifilar-import-materials" class="btn secondary">Importar materiais</button></div>
+          <div class="unifilar-workspace">
+            <aside class="unifilar-palette">
+              <div class="uf-side-title">Componentes</div><input id="uf-search" class="uf-search" placeholder="Buscar componente...">
+              <div class="uf-group"><b>ALIMENTAÇÃO / MEDIÇÃO</b><button draggable="true" data-uf-type="entrada">Rede / Entrada</button><button draggable="true" data-uf-type="medidor">Medidor</button><button draggable="true" data-uf-type="transformador">Transformador</button><button draggable="true" data-uf-type="gerador">Gerador</button></div>
+              <div class="uf-group"><b>QUADROS E BARRAMENTOS</b><button draggable="true" data-uf-type="quadro">Quadro</button><button draggable="true" data-uf-type="barramento">Barramento</button><button draggable="true" data-uf-type="pente">Barramento pente</button><button draggable="true" data-uf-type="barramento_n">Barramento N</button><button draggable="true" data-uf-type="terra">Barramento PE</button></div>
+              <div class="uf-group"><b>PROTEÇÃO</b><button draggable="true" data-uf-type="disjuntor">Disjuntor</button><button draggable="true" data-uf-type="idr">IDR (DR)</button><button draggable="true" data-uf-type="dps">DPS</button><button draggable="true" data-uf-type="fusivel">Fusível</button><button draggable="true" data-uf-type="seccionadora">Chave seccionadora</button></div>
+              <div class="uf-group"><b>CIRCUITOS E CARGAS</b><button draggable="true" data-uf-type="circuito">Circuito / Carga</button><button draggable="true" data-uf-type="tomada">Tomada</button><button draggable="true" data-uf-type="iluminacao">Iluminação</button><button draggable="true" data-uf-type="motor">Motor</button></div>
+              <div class="uf-group"><b>PERSONALIZADOS</b><div id="uf-custom-list"></div><button id="uf-create-symbol" class="uf-create-symbol">＋ Criar novo símbolo</button></div>
+            </aside>
+            <div class="uf-canvas-wrap"><div class="uf-canvas-tabs"><button data-uf-system="mono">Monofásico</button><button data-uf-system="bi">Bifásico</button><button data-uf-system="tri">Trifásico</button></div><div id="unifilar-canvas" class="unifilar-canvas"><svg id="unifilar-lines"></svg><div id="unifilar-nodes"></div></div></div>
+            <aside id="unifilar-properties" class="unifilar-properties"><div class="uf-side-title">Propriedades</div><p class="muted">Selecione um componente.</p></aside>
+          </div>
+          <div class="unifilar-footer"><span id="unifilar-summary">Potência: 0 W • Corrente calculada: 0 A</span><button id="unifilar-materials" class="btn secondary">Lista de Materiais</button></div>
         </div>
       </section>
 

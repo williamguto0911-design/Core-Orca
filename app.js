@@ -7,6 +7,9 @@ let clientes=[], materiais=[], servicos=[], orcamentos=[], ordens=[], agenda=[],
 let editorItens=[];
 let listaMaterialItens=[];
 let singleSessionClaimed=false;
+let companyModules={};
+let unifilarDoc={id:null,nome:"Novo esquema",vinculo_tipo:"",vinculo_id:null,elementos:[],conexoes:[],materiais:[]};
+let unifilarSelected=null,unifilarConnectFrom=null;
 
 function singleSessionStorageKey(userId){return `core_orca_single_session_${userId}`}
 function getOrCreateDeviceSessionToken(userId){
@@ -56,7 +59,7 @@ const statusLabel=s=>String(s||"").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUp
 async function init(){
   const {data:{session}}=await sb.auth.getSession();
   if(session) await showApp(session); else showLogin();
-  sb.auth.onAuthStateChange(async(event,session)=>{if(session)await showApp(session);else showLogin()});
+  sb.auth.onAuthStateChange(async(event,session)=>{if(event==="PASSWORD_RECOVERY"&&session){currentSession=session;showRecoveryPasswordForm();return}if(session)await showApp(session);else showLogin()});
 }
 function showLogin(){$("login-screen").classList.remove("hidden");$("app").classList.add("hidden")}
 async function showApp(session){
@@ -145,7 +148,7 @@ async function refreshAll(){
     navigate("admin-plataforma");
     return;
   }
-  await Promise.all([loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa(),loadRecibos(),loadListasMateriais(),loadCargos()]);
+  await Promise.all([loadCompanyModules(),loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa(),loadRecibos(),loadListasMateriais(),loadCargos()]);
   applyPermissions();renderDashboard();renderCurrent();
 }
 function renderCurrent(){
@@ -168,7 +171,11 @@ function renderCurrent(){
   if(currentPage==="recibos")renderRecibos();
   if(currentPage==="cargos")renderCargos();
   if(currentPage==="admin-plataforma")renderSaasAdmin();
+  if(currentPage==="unifilar")renderUnifilar();
 }
+async function loadCompanyModules(){ if(currentUserProfile?.is_platform_admin){companyModules={};return} const {data,error}=await sb.rpc("minha_empresa_modulos_v040"); if(error){console.warn("Módulos comerciais:",error.message);companyModules={};return} companyModules=data||{}; }
+function commercialModuleEnabled(m){return companyModules?.[m]!==false}
+
 async function loadClientes(){
  const empresaId=currentUserProfile?.empresa_id;
  if(!empresaId){clientes=[];return}
@@ -245,7 +252,7 @@ async function loadUsuarios(){const {data,error}=await sb.from("empresa_usuarios
 async function loadRecibos(){const {data,error}=await sb.from("recibos").select("*,clientes(nome)").order("created_at",{ascending:false});if(error){recibos=[];return}recibos=data||[]}
 async function loadListasMateriais(){const {data,error}=await sb.from("listas_materiais").select("*,clientes(nome),orcamentos(numero),recibos!listas_materiais_recibo_id_fkey(numero),ordens_servico(numero),lista_materiais_itens(id)").order("created_at",{ascending:false});if(error){listasMateriais=[];console.warn("Listas de materiais:",error.message);return}listasMateriais=data||[]}
 async function loadCargos(){const {data,error}=await sb.from("cargos").select("*").order("nome");if(error){cargos=[];return}cargos=data||[]}
-async function loadSaasAdmin(){const {data,error}=await sb.rpc("admin_list_empresas");if(error){empresasSaas=[];return}empresasSaas=data||[]}
+async function loadSaasAdmin(){const [{data,error},{data:mods,error:me}]=await Promise.all([sb.rpc("admin_list_empresas"),sb.rpc("admin_get_empresa_modulos_v040")]);if(error){empresasSaas=[];return}const mm=Object.fromEntries((mods||[]).map(x=>[x.empresa_id,x.modulos||{}]));empresasSaas=(data||[]).map(x=>({...x,modulos_ativos:mm[x.id]||{}}));if(me)console.warn("Módulos:",me.message)}
 function can(module,action="read"){
  if(currentUserProfile?.is_platform_admin)return false;
  if(currentUserProfile?.tipo==="gerente")return true;
@@ -267,7 +274,7 @@ function applyPermissions(){
  });
 
  document.querySelectorAll("[data-module]").forEach(el=>{
-   const allowed=!platform && !noAccess && (manager || can(el.dataset.module,"read"));
+   const allowed=!platform && !noAccess && commercialModuleEnabled(el.dataset.module) && (manager || can(el.dataset.module,"read"));
    el.classList.toggle("hidden",!allowed);
  });
 
@@ -309,7 +316,7 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Unifilar",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 
@@ -660,7 +667,8 @@ async function openProof(path){const {data,error}=await sb.storage.from("comprov
 async function viewRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);openModal("Recibo "+r.numero,`<p><b>Cliente:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Total:</b> ${money(r.total)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor</th></tr></thead><tbody>${(itens||[]).map(i=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("")}</tbody></table></div><h4>Pagamentos</h4><div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Pagamento</th><th>Valor</th><th>Método</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${p.vencimento?new Date(p.vencimento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${p.data_pagamento?new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${money(p.valor)}</td><td>${esc(p.metodo_pagamento||"-")}</td><td>${p.status==="pago"?"Pago":"Pendente"}</td><td><button class="action-btn" onclick="paymentPopup('${p.id}','${id}',${p.status!=="pago"})">${p.status==="pago"?"Marcar pendente":"Marcar pago"}</button>${p.comprovante_path?` <button class="action-btn" onclick="openProof('${p.comprovante_path}')">Comprovante</button>`:""}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn secondary" onclick="gerenciarPagamentosRecibo('${id}')">Pagamentos / Parcelamento</button><button class="btn primary" onclick="printRecibo('${id}')">PDF / Imprimir</button></div>`)}
 async function printRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const pay=`<h3>Pagamentos</h3><table><thead><tr><th>Parcela</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`${clientePDFHTML(clienteDoDocumento(r),"Dados cadastrais do pagador / cliente")}<p><b>Emissão:</b> ${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
 
-const permissionModules=["clientes","materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes"];
+const permissionModules=["clientes","materiais","lista_materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes","unifilar"];
+const commercialModules=permissionModules;
 function renderCargos(){const q=$("cargo-search").value,rows=cargos.filter(c=>smartSearch(c,q));$("cargos-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.descricao||"-")}</td><td>${Object.keys(c.permissoes||{}).filter(k=>c.permissoes[k]?.read||c.permissoes[k]===true).map(statusLabel).join(", ")||"Sem acesso"}</td><td><button class="action-btn" onclick="cargoForm(cargos.find(x=>x.id==='${c.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="4">Nenhum cargo personalizado.</td></tr>'}
 function cargoForm(c={}){
  const p=c.permissoes||{};openModal(c.id?"Editar cargo":"Novo cargo",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(c.nome)}"></label><label>Descrição<input id="f-desc" value="${esc(c.descricao)}"></label></div><div class="permission-grid">${permissionModules.map(m=>`<div class="permission-card"><b>${statusLabel(m)}</b><label><input type="checkbox" data-pm="${m}" data-pa="read" ${p[m]?.read||p[m]===true?"checked":""}> Visualizar</label><label><input type="checkbox" data-pm="${m}" data-pa="write" ${p[m]?.write?"checked":""}> Criar/editar</label><label><input type="checkbox" data-pm="${m}" data-pa="delete" ${p[m]?.delete?"checked":""}> Excluir</label></div>`).join("")}</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
@@ -684,7 +692,9 @@ function renderSaasAdmin(){
    <td>${e.licenca_validade?new Date(e.licenca_validade+"T12:00:00").toLocaleDateString("pt-BR"):"Sem limite"}</td>
    <td><div class="action-group">
      <button class="action-btn" onclick="manageLicenses('${e.id}')">Licenças</button>
+     <button class="action-btn" onclick="manageCompanyModules('${e.id}')">Módulos</button>
      <button class="action-btn" onclick="empresaSaasForm(empresasSaas.find(x=>x.id==='${e.id}'))">Editar</button>
+     <button class="action-btn" onclick="adminResetManager('${e.id}')">Senha gerente</button>
      ${e.nome==="Administração Core Orça"?"":`<button class="action-btn danger" onclick="deleteCompany('${e.id}')">Excluir</button>`}
    </div></td>
  </tr>`).join("")||'<tr><td colspan="8">Nenhuma empresa cadastrada.</td></tr>';
@@ -783,24 +793,16 @@ function forcePasswordChange(){
 
 async function manageLicenses(empresaId){
  const empresa=empresasSaas.find(e=>e.id===empresaId);
- const {data,error}=await sb.rpc("admin_list_licencas_v11",{p_empresa_id:empresaId});
+ const {data,error}=await sb.rpc("admin_list_licencas_v040",{p_empresa_id:empresaId});
  if(error)return toast(error.message);
  const rows=data||[];
- openModal("Licenças — "+empresa.nome,`<div class="panel-head"><div><p class="muted">Gerencie individualmente cada licença desta empresa.</p></div><button id="add-license-btn" class="btn primary">+ Licença</button></div>
+ openModal("Licenças — "+empresa.nome,`<div class="panel-head"><div><p class="muted">As licenças são vinculadas automaticamente aos e-mails dos usuários ativos. O gerente também consome uma licença. Altere a quantidade em Editar empresa.</p></div></div>
  <div class="license-list">${rows.map(l=>`<div class="license-row">
    <b>Licença ${l.numero}</b>
    <span class="${l.status==="ativa"?"license-active":"license-blocked"}">${statusLabel(l.status)}</span>
    <span>${esc(l.usuario_email||"Não atribuída")}</span>
-   <div class="action-group">
-     ${l.status==="ativa"?`<button class="action-btn warning" onclick="licenseAction('${l.id}','block','${empresaId}')">Bloquear</button>`:`<button class="action-btn" onclick="licenseAction('${l.id}','activate','${empresaId}')">Ativar</button>`}
-     <button class="action-btn danger" onclick="licenseAction('${l.id}','delete','${empresaId}')">Excluir</button>
-   </div>
+
  </div>`).join("")||"<p>Nenhuma licença cadastrada.</p>"}</div>`);
- $("add-license-btn").onclick=async()=>{
-   const {error}=await sb.rpc("admin_add_license_v11",{p_empresa_id:empresaId});
-   if(error)return toast(error.message);
-   closeModal();await loadSaasAdmin();renderSaasAdmin();manageLicenses(empresaId);
- };
 }
 
 async function licenseAction(id,action,empresaId){
@@ -848,7 +850,7 @@ async function confirmCompra(id){if(!confirm("Confirmar compra? Isso dará entra
 
 function renderUsuarios(){
  const q=$("usuario-search").value, rows=usuarios.filter(u=>smartSearch(u,q));
- $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><div class="actions"><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button>${currentUserProfile?.tipo==="gerente"?`<button class="action-btn" onclick="deleteUsuario('${u.id}')">Excluir</button>`:""}</div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
+ $("usuarios-table").innerHTML=rows.map(u=>`<tr><td>${esc(u.nome||"-")}</td><td>${esc(u.email)}</td><td>${statusLabel(u.tipo)}</td><td>${esc(u.cargos?.nome||"-")}</td><td>${u.ativo?"Ativo":"Inativo"}</td><td><div class="actions"><button class="action-btn" onclick="editUsuario('${u.id}')">Editar</button>${currentUserProfile?.tipo==="gerente"?`<button class="action-btn" onclick="resetUserPassword('${u.id}')">Redefinir senha</button><button class="action-btn" onclick="deleteUsuario('${u.id}')">Excluir</button>`:""}</div></td></tr>`).join("")||'<tr><td colspan="6">Nenhum usuário da empresa.</td></tr>';
 }
 function usuarioForm(u={}){
  const creating=!u.id;
@@ -1327,6 +1329,7 @@ async function importCSV(file){
 }
 
 $("login-form").onsubmit=async e=>{e.preventDefault();$("login-error").textContent="";const {error}=await sb.auth.signInWithPassword({email:$("login-email").value.trim(),password:$("login-password").value});if(error)$("login-error").textContent="E-mail ou senha inválidos."};
+$("forgot-password-btn").onclick=async()=>{const email=$("login-email").value.trim().toLowerCase();if(!email){$("login-error").textContent="Informe seu e-mail para receber o link de redefinição.";return}const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});$("login-error").textContent=error?error.message:"Enviamos um link de redefinição para o seu e-mail."};
 $("logout-btn").onclick=async()=>{await releaseSingleSession();await sb.auth.signOut();currentSession=null;showLogin()};
 $("refresh-btn").onclick=refreshAll;$("modal-close").onclick=closeModal;$("modal").onclick=e=>{if(e.target===$("modal"))closeModal()};
 $("novo-cliente").onclick=()=>clienteForm();$("novo-material").onclick=()=>materialForm();$("nova-lista-material").onclick=()=>listaMaterialForm();$("novo-servico").onclick=()=>servicoForm();$("nova-movimentacao").onclick=movementForm;
@@ -1566,3 +1569,47 @@ function applyDeclaredMasks(root=document){
 }
 const maskObserver=new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1)applyDeclaredMasks(n)})));
 document.addEventListener("DOMContentLoaded",()=>{applyDeclaredMasks();maskObserver.observe(document.body,{childList:true,subtree:true})});
+
+
+function showRecoveryPasswordForm(){
+ showLogin();openModal("Redefinir senha",`<form id="recovery-password-form"><p class="muted">Defina uma nova senha para concluir a recuperação da conta.</p><label>Nova senha<input id="recovery-p1" type="password" minlength="8" required></label><label>Confirmar senha<input id="recovery-p2" type="password" minlength="8" required></label><div id="recovery-error" class="error"></div><div class="modal-actions"><button class="btn primary">Salvar nova senha</button></div></form>`);$("recovery-password-form").onsubmit=async e=>{e.preventDefault();const a=$("recovery-p1").value,b=$("recovery-p2").value;if(a!==b)return $("recovery-error").textContent="As senhas não coincidem.";const {error}=await sb.auth.updateUser({password:a});if(error)return $("recovery-error").textContent=error.message;closeModal();toast("Senha redefinida. Você já pode entrar.");await sb.auth.signOut();showLogin()}}
+function changeMyPassword(){openModal("Alterar minha senha",`<form id="my-password-form"><label>Nova senha<input id="myp1" type="password" minlength="8" required></label><label>Confirmar nova senha<input id="myp2" type="password" minlength="8" required></label><div id="myp-err" class="error"></div><div class="modal-actions"><button class="btn primary">Alterar senha</button></div></form>`);$("my-password-form").onsubmit=async e=>{e.preventDefault();const a=$("myp1").value,b=$("myp2").value;if(a!==b)return $("myp-err").textContent="As senhas não coincidem.";const {error}=await sb.auth.updateUser({password:a});if(error)return $("myp-err").textContent=error.message;closeModal();toast("Senha alterada com sucesso")}}
+document.addEventListener("DOMContentLoaded",()=>$("change-my-password")?.addEventListener("click",changeMyPassword));
+
+/* V040 — módulos comerciais */
+async function manageCompanyModules(empresaId){
+ const e=empresasSaas.find(x=>x.id===empresaId); if(!e)return;
+ const m=e.modulos_ativos||{};
+ openModal("Módulos — "+e.nome,`<p class="muted">Ative somente os módulos contratados por esta empresa. As permissões de cargo continuam valendo dentro dos módulos ativos.</p><div class="module-grid">${commercialModules.map(k=>`<label><input type="checkbox" data-cm="${k}" ${m[k]!==false?"checked":""}> ${statusLabel(k)}</label>`).join("")}</div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Cancelar</button><button id="save-company-modules" class="btn primary">Salvar módulos</button></div>`);
+ $("save-company-modules").onclick=async()=>{const mods={};document.querySelectorAll("[data-cm]").forEach(x=>mods[x.dataset.cm]=x.checked);const {error}=await sb.rpc("admin_set_empresa_modulos_v040",{p_empresa_id:empresaId,p_modulos:mods});if(error)return toast(error.message);closeModal();await loadSaasAdmin();renderSaasAdmin();toast("Módulos atualizados")};
+}
+async function resetUserPassword(id){
+ const u=usuarios.find(x=>x.id===id);if(!u||!confirm(`Gerar uma nova senha temporária para ${u.email}?`))return;
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"reset-user-password",usuario_id:id}});if(error||data?.error)return toast("Erro: "+await edgeFunctionError(error,data));showTemporaryPassword(data.email,data.temporary_password,"Senha redefinida");
+}
+async function adminResetManager(empresaId){
+ const {data,error}=await sb.rpc("admin_list_gerentes_v040",{p_empresa_id:empresaId});if(error)return toast(error.message);const rows=data||[];if(!rows.length)return toast("Nenhum gerente ativo.");
+ openModal("Redefinir senha do gerente",rows.map(u=>`<div class="license-row"><span><b>${esc(u.nome||"Gerente")}</b><br>${esc(u.email)}</span><button class="action-btn" onclick="adminResetManagerUser('${u.id}')">Gerar senha temporária</button></div>`).join(""));
+}
+async function adminResetManagerUser(id){const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"reset-user-password",usuario_id:id}});if(error||data?.error)return toast("Erro: "+await edgeFunctionError(error,data));showTemporaryPassword(data.email,data.temporary_password,"Senha redefinida")}
+
+/* V040 — editor unifilar vetorial */
+const UF={entrada:["REDE","Entrada"],quadro:["Q","Quadro"],disjuntor:["DJ","Disjuntor"],idr:["IDR","IDR"],dps:["DPS","DPS"],barramento:["━","Barramento"],circuito:["C","Circuito"],terra:["⏚","PE / Terra"]};
+function ufId(){return crypto.randomUUID?.()||Math.random().toString(36).slice(2)}
+function renderUnifilar(){if(!$("unifilar-canvas"))return;$("unifilar-name").value=unifilarDoc.nome||"";$("unifilar-vinculo-tipo").value=unifilarDoc.vinculo_tipo||"";updateUnifilarLinks();drawUnifilar();}
+function updateUnifilarLinks(){const t=$("unifilar-vinculo-tipo")?.value||unifilarDoc.vinculo_tipo;let a=[];if(t==="orcamento")a=orcamentos.map(x=>[x.id,x.numero]);if(t==="os")a=ordens.map(x=>[x.id,x.numero]);if(t==="lista_materiais")a=listasMateriais.map(x=>[x.id,x.numero||x.nome||"Lista"]);if($("unifilar-vinculo-id"))$("unifilar-vinculo-id").innerHTML='<option value="">Selecione...</option>'+a.map(x=>`<option value="${x[0]}" ${x[0]===unifilarDoc.vinculo_id?"selected":""}>${esc(x[1])}</option>`).join("")}
+function addUfNode(type,x,y){const d=UF[type]||["?",type];unifilarDoc.elementos.push({id:ufId(),type,x:Math.max(10,Math.round(x/20)*20),y:Math.max(10,Math.round(y/20)*20),label:d[1],corrente: type==="idr"?40: type==="disjuntor"?20:null,sensibilidade:type==="idr"?30:null,polos:type==="idr"?2:null,potencia:type==="circuito"?1000:null,tensao:type==="circuito"?220:null,fp:1,material_id:null});drawUnifilar()}
+function drawUnifilar(){const box=$("unifilar-nodes"),svg=$("unifilar-lines");if(!box||!svg)return;box.innerHTML=unifilarDoc.elementos.map(n=>{const d=UF[n.type]||["?",n.type];const sub=n.type==="idr"?`${n.polos||2}P • ${n.corrente||40} A • ${n.sensibilidade||30} mA`:n.type==="disjuntor"?`${n.corrente||20} A`:n.type==="circuito"?`${n.potencia||0} W • ${n.tensao||220} V`:"";return `<div class="uf-node ${unifilarSelected===n.id?"selected":""}" data-uf-id="${n.id}" style="left:${n.x}px;top:${n.y}px"><i class="uf-port in" data-port="in"></i><div class="uf-symbol">${d[0]}</div><div class="uf-label">${esc(n.label||d[1])}</div><div class="uf-sub">${esc(sub)}</div><i class="uf-port out" data-port="out"></i></div>`}).join("");
+ const by=Object.fromEntries(unifilarDoc.elementos.map(n=>[n.id,n]));svg.innerHTML=unifilarDoc.conexoes.map(c=>{const a=by[c.from],b=by[c.to];if(!a||!b)return"";const x1=a.x+55,y1=a.y+58,x2=b.x+55,y2=b.y;const ym=(y1+y2)/2;return `<path d="M ${x1} ${y1} V ${ym} H ${x2} V ${y2}" fill="none" stroke="#111827" stroke-width="1.8"/>`}).join("");
+ box.querySelectorAll(".uf-node").forEach(el=>{el.onclick=e=>{e.stopPropagation();const id=el.dataset.ufId;if(e.target.dataset.port==="out"){unifilarConnectFrom=id;toast("Selecione a entrada do componente de destino");return}if(e.target.dataset.port==="in"&&unifilarConnectFrom&&unifilarConnectFrom!==id){if(!unifilarDoc.conexoes.some(c=>c.from===unifilarConnectFrom&&c.to===id))unifilarDoc.conexoes.push({id:ufId(),from:unifilarConnectFrom,to:id});unifilarConnectFrom=null;drawUnifilar();return}unifilarSelected=id;drawUnifilar();drawUfProperties()};el.onpointerdown=e=>{if(e.target.classList.contains("uf-port"))return;const n=unifilarDoc.elementos.find(x=>x.id===el.dataset.ufId),r=$("unifilar-canvas").getBoundingClientRect(),dx=e.clientX-r.left-n.x,dy=e.clientY-r.top-n.y;el.setPointerCapture(e.pointerId);el.onpointermove=ev=>{n.x=Math.max(0,Math.round((ev.clientX-r.left-dx)/20)*20);n.y=Math.max(0,Math.round((ev.clientY-r.top-dy)/20)*20);el.style.left=n.x+"px";el.style.top=n.y+"px";drawUfLines()};el.onpointerup=()=>{el.onpointermove=null}}});drawUfProperties();calcUfSummary();}
+function drawUfLines(){const by=Object.fromEntries(unifilarDoc.elementos.map(n=>[n.id,n]));$("unifilar-lines").innerHTML=unifilarDoc.conexoes.map(c=>{const a=by[c.from],b=by[c.to];if(!a||!b)return"";const x1=a.x+55,y1=a.y+58,x2=b.x+55,y2=b.y,ym=(y1+y2)/2;return `<path d="M ${x1} ${y1} V ${ym} H ${x2} V ${y2}" fill="none" stroke="#111827" stroke-width="1.8"/>`}).join("")}
+function drawUfProperties(){const p=$("unifilar-properties"),n=unifilarDoc.elementos.find(x=>x.id===unifilarSelected);if(!p)return;if(!n){p.innerHTML='<b>Propriedades</b><p class="muted">Selecione um componente.</p>';return}p.innerHTML=`<b>Propriedades</b><label>Identificação<input id="uf-label" value="${esc(n.label)}"></label>${["disjuntor","idr"].includes(n.type)?`<label>Corrente (A)<input id="uf-current" type="number" value="${n.corrente||0}"></label>`:""}${n.type==="idr"?`<label>Polos<select id="uf-poles"><option>2</option><option>4</option></select></label><label>Sensibilidade (mA)<input id="uf-sens" type="number" value="${n.sensibilidade||30}"></label>`:""}${n.type==="circuito"?`<label>Potência (W)<input id="uf-power" type="number" value="${n.potencia||0}"></label><label>Tensão (V)<input id="uf-voltage" type="number" value="${n.tensao||220}"></label><label>FP<input id="uf-fp" type="number" step="0.01" value="${n.fp||1}"></label>`:""}<label>Material associado<select id="uf-material"><option value="">Nenhum</option>${materiais.map(m=>`<option value="${m.id}" ${m.id===n.material_id?"selected":""}>${esc((m.codigo||"")+" - "+m.nome)}</option>`).join("")}</select></label><button id="uf-delete" class="btn secondary full">Excluir componente</button>`;if($("uf-poles"))$("uf-poles").value=String(n.polos||2);p.querySelectorAll("input,select").forEach(x=>x.onchange=()=>{n.label=$("uf-label")?.value||n.label;if($("uf-current"))n.corrente=Number($("uf-current").value);if($("uf-poles"))n.polos=Number($("uf-poles").value);if($("uf-sens"))n.sensibilidade=Number($("uf-sens").value);if($("uf-power"))n.potencia=Number($("uf-power").value);if($("uf-voltage"))n.tensao=Number($("uf-voltage").value);if($("uf-fp"))n.fp=Number($("uf-fp").value)||1;n.material_id=$("uf-material")?.value||null;drawUnifilar()});$("uf-delete").onclick=()=>{unifilarDoc.elementos=unifilarDoc.elementos.filter(x=>x.id!==n.id);unifilarDoc.conexoes=unifilarDoc.conexoes.filter(c=>c.from!==n.id&&c.to!==n.id);unifilarSelected=null;drawUnifilar()}}
+function calcUfSummary(){const cs=unifilarDoc.elementos.filter(n=>n.type==="circuito"),p=cs.reduce((a,n)=>a+Number(n.potencia||0),0),i=cs.reduce((a,n)=>a+(Number(n.potencia||0)/(Number(n.tensao||220)*Number(n.fp||1))),0);if($("unifilar-summary"))$("unifilar-summary").textContent=`Potência: ${p.toLocaleString("pt-BR")} W • Corrente somada: ${i.toFixed(2)} A • IDRs: ${unifilarDoc.elementos.filter(n=>n.type==="idr").length}`}
+async function saveUnifilar(){unifilarDoc.nome=$("unifilar-name").value.trim()||"Novo esquema";unifilarDoc.vinculo_tipo=$("unifilar-vinculo-tipo").value||null;unifilarDoc.vinculo_id=$("unifilar-vinculo-id").value||null;unifilarDoc.materiais=unifilarDoc.elementos.filter(n=>n.material_id).map(n=>({material_id:n.material_id,quantidade:1,elemento_id:n.id}));const obj={empresa_id:currentUserProfile.empresa_id,nome:unifilarDoc.nome,vinculo_tipo:unifilarDoc.vinculo_tipo,vinculo_id:unifilarDoc.vinculo_id,elementos:unifilarDoc.elementos,conexoes:unifilarDoc.conexoes,materiais:unifilarDoc.materiais,updated_at:new Date().toISOString()};const r=unifilarDoc.id?await sb.from("esquemas_unifilares").update(obj).eq("id",unifilarDoc.id).select().single():await sb.from("esquemas_unifilares").insert(obj).select().single();if(r.error)return toast(r.error.message);unifilarDoc={...unifilarDoc,...r.data};toast("Esquema salvo")}
+async function openUnifilarList(){const {data,error}=await sb.from("esquemas_unifilares").select("id,nome,updated_at").order("updated_at",{ascending:false});if(error)return toast(error.message);openModal("Abrir esquema unifilar",`<div class="license-list">${(data||[]).map(x=>`<div class="license-row"><span><b>${esc(x.nome)}</b><br><small>${new Date(x.updated_at).toLocaleString("pt-BR")}</small></span><button class="action-btn" onclick="loadUnifilar('${x.id}')">Abrir</button></div>`).join("")||'<p>Nenhum esquema salvo.</p>'}</div>`)}
+async function loadUnifilar(id){const {data,error}=await sb.from("esquemas_unifilares").select("*").eq("id",id).single();if(error)return toast(error.message);unifilarDoc={...data,elementos:data.elementos||[],conexoes:data.conexoes||[],materiais:data.materiais||[]};unifilarSelected=null;closeModal();renderUnifilar()}
+function newUnifilar(){unifilarDoc={id:null,nome:"Novo esquema",vinculo_tipo:"",vinculo_id:null,elementos:[],conexoes:[],materiais:[]};unifilarSelected=null;renderUnifilar()}
+async function importUnifilarLinkedMaterials(){const t=$("unifilar-vinculo-tipo").value,id=$("unifilar-vinculo-id").value;if(!t||!id)return toast("Selecione o documento vinculado.");let table,fk;if(t==="orcamento"){table="orcamento_itens";fk="orcamento_id"}else if(t==="os"){table="ordem_servico_itens";fk="ordem_servico_id"}else{table="lista_materiais_itens";fk="lista_id"}const {data,error}=await sb.from(table).select("*").eq(fk,id);if(error)return toast(error.message);const rows=(data||[]).filter(x=>x.material_id);unifilarDoc.materiais=rows.map(x=>({material_id:x.material_id,quantidade:Number(x.quantidade)||1,origem:t}));toast(`${rows.length} material(is) importado(s) do vínculo.`)}
+function showUnifilarMaterials(){const all=[...(unifilarDoc.materiais||[]),...unifilarDoc.elementos.filter(n=>n.material_id).map(n=>({material_id:n.material_id,quantidade:1}))];const map={};all.forEach(i=>{if(!i.material_id)return;map[i.material_id]=(map[i.material_id]||0)+Number(i.quantidade||1)});const rows=Object.entries(map).map(([id,q])=>{const m=materiais.find(x=>x.id===id);return m?`<tr><td>${esc(m.codigo||"")}</td><td>${esc(m.nome)}</td><td>${Number(q).toLocaleString("pt-BR")}</td></tr>`:""}).join("");openModal("Materiais do esquema",`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Material</th><th>Qtd.</th></tr></thead><tbody>${rows||'<tr><td colspan="3">Nenhum material associado ou importado.</td></tr>'}</tbody></table></div>`)}
+function printUnifilar(){const c=$("unifilar-canvas").cloneNode(true);const w=window.open("","_blank");w.document.write(`<html><head><title>${esc(unifilarDoc.nome)}</title><style>body{font-family:Arial;padding:20px}.sheet{border:1px solid #111;padding:15px}.canvas{position:relative;width:1100px;height:750px;overflow:hidden}.uf-node{position:absolute;min-width:110px;border:1.5px solid #111;padding:8px;text-align:center}.uf-port{display:none}svg{position:absolute;width:2000px;height:1400px}.title{border-top:2px solid #111;margin-top:15px;padding-top:8px;display:flex;justify-content:space-between}</style></head><body><div class="sheet"><h2>ESQUEMA UNIFILAR — ${esc(unifilarDoc.nome)}</h2><div class="canvas">${c.innerHTML}</div><div class="title"><b>${esc(empresa?.nome_fantasia||empresa?.razao_social||"Core Orça")}</b><span>Data: ${new Date().toLocaleDateString("pt-BR")}</span></div></div><script>onload=()=>print()<\/script></body></html>`);w.document.close()}
+document.addEventListener("DOMContentLoaded",()=>{document.querySelectorAll("[data-uf-type]").forEach(b=>b.ondragstart=e=>e.dataTransfer.setData("text/uf",b.dataset.ufType));const c=$("unifilar-canvas");if(c){c.ondragover=e=>e.preventDefault();c.ondrop=e=>{e.preventDefault();const r=c.getBoundingClientRect();addUfNode(e.dataTransfer.getData("text/uf"),e.clientX-r.left+c.scrollLeft,e.clientY-r.top+c.scrollTop)};c.onclick=()=>{unifilarSelected=null;drawUnifilar()}}$("unifilar-new")?.addEventListener("click",newUnifilar);$("unifilar-open")?.addEventListener("click",openUnifilarList);$("unifilar-save")?.addEventListener("click",saveUnifilar);$("unifilar-pdf")?.addEventListener("click",printUnifilar);$("unifilar-materials")?.addEventListener("click",showUnifilarMaterials);$("unifilar-import-materials")?.addEventListener("click",importUnifilarLinkedMaterials);$("unifilar-vinculo-tipo")?.addEventListener("change",updateUnifilarLinks);});

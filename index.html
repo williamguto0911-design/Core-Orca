@@ -16,6 +16,7 @@
       <label>E-mail<input id="login-email" type="email" required autocomplete="username"></label>
       <label>Senha<input id="login-password" type="password" required autocomplete="current-password"></label>
       <button class="btn primary full">Entrar</button>
+      <button type="button" id="forgot-password-btn" class="link-btn">Esqueci minha senha</button>
       <div id="login-error" class="error"></div>
     </form>
   </section>
@@ -27,7 +28,8 @@
         <button class="nav-item active" data-page="dashboard">Dashboard</button>
         <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
         <button class="nav-item" data-page="materiais" data-module="materiais">Materiais</button>
-        <button class="nav-item" data-page="lista-materiais" data-module="materiais">Lista de Materiais</button>
+        <button class="nav-item" data-page="lista-materiais" data-module="lista_materiais">Lista de Materiais</button>
+        <button class="nav-item" data-page="unifilar" data-module="unifilar">Esquema Unifilar</button>
         <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
         <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
         <button class="nav-item" data-page="reposicao-estoque" data-module="estoque">Reposição de Estoque</button>
@@ -47,6 +49,7 @@
       </nav>
       <div class="sidebar-footer">
         <small id="user-email"></small>
+        <button id="change-my-password" class="btn secondary full">Alterar minha senha</button>
         <button id="logout-btn" class="btn secondary full">Sair</button>
       </div>
     </aside>
@@ -240,6 +243,20 @@
           <p class="muted">Cadastre os usuários da empresa. O Gerente pode liberar acesso por cargo. O login precisa existir no Supabase Auth.</p>
           <div class="toolbar"><input id="usuario-search" placeholder="Pesquisar usuário..."><button id="novo-usuario" class="btn primary">+ Perfil de usuário</button></div>
           <div class="table-wrap"><table><thead><tr><th>Nome</th><th>E-mail</th><th>Tipo</th><th>Cargo</th><th>Status</th><th></th></tr></thead><tbody id="usuarios-table"></tbody></table></div>
+        </div>
+      </section>
+
+
+      <section id="page-unifilar" class="page hidden">
+        <div class="panel unifilar-panel">
+          <div class="panel-head"><div><h3>Esquema Unifilar</h3><p class="muted">Monte quadros, proteções e circuitos. Arraste os componentes, conecte-os e associe materiais.</p></div><div class="action-group"><button id="unifilar-new" class="btn secondary">Novo</button><button id="unifilar-open" class="btn secondary">Abrir</button><button id="unifilar-save" class="btn primary">Salvar</button><button id="unifilar-pdf" class="btn secondary">PDF</button></div></div>
+          <div class="unifilar-meta"><input id="unifilar-name" placeholder="Nome do esquema"><select id="unifilar-vinculo-tipo"><option value="">Sem vínculo</option><option value="orcamento">Orçamento</option><option value="os">Ordem de Serviço</option><option value="lista_materiais">Lista de Materiais</option></select><select id="unifilar-vinculo-id"><option value="">Selecione...</option></select><button id="unifilar-import-materials" class="btn secondary">Importar materiais do vínculo</button></div>
+          <div class="unifilar-workspace">
+            <aside class="unifilar-palette"><b>Componentes</b><button draggable="true" data-uf-type="entrada">Entrada</button><button draggable="true" data-uf-type="quadro">Quadro</button><button draggable="true" data-uf-type="disjuntor">Disjuntor</button><button draggable="true" data-uf-type="idr">IDR</button><button draggable="true" data-uf-type="dps">DPS</button><button draggable="true" data-uf-type="barramento">Barramento</button><button draggable="true" data-uf-type="circuito">Circuito / Carga</button><button draggable="true" data-uf-type="terra">Terra / PE</button></aside>
+            <div id="unifilar-canvas" class="unifilar-canvas"><svg id="unifilar-lines"></svg><div id="unifilar-nodes"></div></div>
+            <aside id="unifilar-properties" class="unifilar-properties"><b>Propriedades</b><p class="muted">Selecione um componente.</p></aside>
+          </div>
+          <div class="unifilar-footer"><span id="unifilar-summary">Potência: 0 W • Corrente calculada: 0 A</span><button id="unifilar-materials" class="btn secondary">Materiais do esquema</button></div>
         </div>
       </section>
 

@@ -250,13 +250,23 @@
       <section id="page-unifilar" class="page hidden">
         <div class="panel unifilar-panel uf-dark">
           <div class="uf-toolbar">
-            <div><b>Esquema Unifilar</b><span class="uf-standard">Simbologia técnica baseada em IEC 60617</span></div>
-            <div class="action-group"><button id="unifilar-new" class="btn secondary">Novo</button><button id="unifilar-open" class="btn secondary">Abrir</button><button id="unifilar-organize" class="btn secondary">Organizar</button><button id="unifilar-save" class="btn primary">Salvar</button><button id="unifilar-pdf" class="btn secondary">PDF</button></div>
+            <div class="uf-brand"><b>CORE ORÇA · ESQUEMA UNIFILAR</b><span class="uf-standard">Editor técnico vetorial</span></div>
+            <div class="action-group"><button id="unifilar-save" class="btn secondary">Salvar</button><button id="unifilar-pdf" class="btn secondary">Exportar PDF</button><button id="unifilar-materials" class="btn secondary">Lista de Materiais</button></div>
+          </div>
+          <div class="uf-cad-toolbar">
+            <button id="uf-mode-select" class="uf-cad-tool active" title="Selecionar">↖ <span>Selecionar</span></button>
+            <button id="uf-mode-connect" class="uf-cad-tool" title="Ligar componentes">⌁ <span>Ligar</span></button>
+            <button id="uf-delete-selected" class="uf-cad-tool" title="Apagar selecionado">⌫ <span>Apagar</span></button>
+            <button id="uf-rotate-selected" class="uf-cad-tool" title="Girar 90°">↻ <span>Girar</span></button>
+            <span class="uf-tool-sep"></span>
+            <button id="unifilar-new" class="uf-cad-tool">＋ <span>Novo</span></button><button id="unifilar-open" class="uf-cad-tool">▣ <span>Abrir</span></button><button id="unifilar-organize" class="uf-cad-tool">▦ <span>Organizar</span></button>
+            <span class="uf-tool-sep"></span>
+            <label class="uf-wire-label">Condutor <select id="uf-wire-type"><option value="fase">Fase R</option><option value="fase_s">Fase S</option><option value="fase_t">Fase T</option><option value="neutro">Neutro N</option><option value="terra">Terra PE</option></select></label>
           </div>
           <div class="unifilar-meta"><input id="unifilar-name" placeholder="Nome do esquema"><select id="unifilar-system"><option value="mono">Monofásico</option><option value="bi">Bifásico</option><option value="tri">Trifásico</option></select><select id="unifilar-vinculo-tipo"><option value="">Sem vínculo</option><option value="orcamento">Orçamento</option><option value="os">Ordem de Serviço</option><option value="lista_materiais">Lista de Materiais</option></select><select id="unifilar-vinculo-id"><option value="">Selecione...</option></select><button id="unifilar-import-materials" class="btn secondary">Importar materiais</button></div>
           <div class="unifilar-workspace">
             <aside class="unifilar-palette">
-              <div class="uf-side-title">Componentes</div><div class="uf-insert-hint">Selecione um componente e clique no desenho para inserir.</div><input id="uf-search" class="uf-search" placeholder="Buscar componente...">
+              <div class="uf-palette-tabs"><b>Componentes</b><span>Símbolos</span><span>Personalizados</span></div><div class="uf-insert-hint">Selecione um componente e clique no desenho para inserir.</div><input id="uf-search" class="uf-search" placeholder="Buscar componente...">
               <div class="uf-group"><b>ALIMENTAÇÃO / MEDIÇÃO</b><button data-uf-type="entrada">Rede / Entrada</button><button data-uf-type="medidor">Medidor</button><button data-uf-type="transformador">Transformador</button><button data-uf-type="gerador">Gerador</button></div>
               <div class="uf-group"><b>QUADROS E BARRAMENTOS</b><button data-uf-type="quadro">Quadro</button><button data-uf-type="barramento">Barramento</button><button data-uf-type="pente">Barramento pente</button><button data-uf-type="barramento_n">Barramento N</button><button data-uf-type="terra">Barramento PE</button></div>
               <div class="uf-group"><b>PROTEÇÃO</b><button data-uf-type="disjuntor">Disjuntor</button><button data-uf-type="idr">IDR (DR)</button><button data-uf-type="dps">DPS</button><button data-uf-type="fusivel">Fusível</button><button data-uf-type="seccionadora">Chave seccionadora</button></div>
@@ -266,7 +276,7 @@
             <div class="uf-canvas-wrap"><div class="uf-canvas-tabs"><button data-uf-system="mono">Monofásico</button><button data-uf-system="bi">Bifásico</button><button data-uf-system="tri">Trifásico</button></div><div id="unifilar-canvas" class="unifilar-canvas"><svg id="unifilar-lines"></svg><div id="unifilar-nodes"></div></div></div>
             <aside id="unifilar-properties" class="unifilar-properties"><div class="uf-side-title">Propriedades</div><p class="muted">Selecione um componente.</p></aside>
           </div>
-          <div class="unifilar-footer"><span id="unifilar-summary">Potência: 0 W • Corrente calculada: 0 A</span><button id="unifilar-materials" class="btn secondary">Lista de Materiais</button></div>
+          <div class="unifilar-footer"><span id="unifilar-summary">Potência: 0 W • Corrente calculada: 0 A</span><span id="uf-mode-status">Modo: Selecionar</span></div>
         </div>
       </section>
 

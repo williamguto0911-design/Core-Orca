@@ -29,7 +29,7 @@
         <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
         <button class="nav-item" data-page="materiais" data-module="materiais">Materiais</button>
         <button class="nav-item" data-page="lista-materiais" data-module="lista_materiais">Lista de Materiais</button>
-        <button class="nav-item" data-page="unifilar" data-module="unifilar">Projeto Elétrico</button>
+        <button class="nav-item" data-page="unifilar" data-module="unifilar">Esquema Vertical</button>
         <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
         <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
         <button class="nav-item" data-page="reposicao-estoque" data-module="estoque">Reposição de Estoque</button>
@@ -249,12 +249,12 @@
 
       <section id="page-unifilar" class="page hidden">
         <div class="panel obra-eletrica-page">
-          <div class="oe-head"><div><h2>Projeto Elétrico da Obra</h2><p>Cadastre a estrutura da obra por pavimento e vincule cada componente aos materiais do banco.</p></div><div class="action-group"><button id="oe-new" class="btn primary">+ Nova obra elétrica</button><button id="oe-open" class="btn secondary">Abrir</button><button id="oe-materials" class="btn secondary">Gerar Lista de Materiais</button><button id="oe-pdf" class="btn secondary">Esquema por pavimentos</button></div></div>
-          <div id="oe-empty" class="oe-empty"><b>Nenhuma obra elétrica aberta.</b><span>Crie uma obra ou abra um cadastro existente.</span></div>
+          <div class="oe-head"><div><h2>Esquema Vertical</h2><p>Cadastre pavimentos, quadros, equipamentos e materiais da instalação. O sistema organiza a obra por pavimento e gera a relação de materiais.</p></div><div class="action-group"><button id="oe-new" class="btn primary">+ Novo esquema vertical</button><button id="oe-open" class="btn secondary">Abrir</button><button id="oe-materials" class="btn secondary">Gerar Lista de Materiais</button><button id="oe-pdf" class="btn secondary">PDF do Esquema Vertical</button></div></div>
+          <div id="oe-empty" class="oe-empty"><b>Nenhum esquema vertical aberto.</b><span>Crie um esquema ou abra uma obra cadastrada.</span></div>
           <div id="oe-work" class="hidden">
             <div class="oe-summary"><div><small>OBRA</small><b id="oe-title">-</b></div><div><small>CLIENTE</small><b id="oe-client">-</b></div><div><small>PAVIMENTOS</small><b id="oe-floor-count">0</b></div><div><small>ITENS</small><b id="oe-item-count">0</b></div></div>
             <div class="oe-options"><b>O que existe na obra?</b><label><input type="checkbox" data-oe-option="subestacao"> Subestação</label><label><input type="checkbox" data-oe-option="lazer"> Lazer</label><label><input type="checkbox" data-oe-option="gerador"> Gerador</label><label><input type="checkbox" data-oe-option="barramento_blindado"> Barramento blindado</label></div>
-            <div class="oe-toolbar"><button id="oe-add-floor" class="btn primary">+ Pavimento</button><button id="oe-add-apartment" class="btn secondary">+ Apartamento</button><button id="oe-add-board" class="btn secondary">+ Quadro / Equipamento</button><button id="oe-add-component" class="btn secondary">+ Componente</button><button id="oe-save" class="btn primary">Salvar</button></div>
+            <div class="oe-toolbar"><button id="oe-add-floor" class="btn primary">+ Pavimento</button><button id="oe-add-apartment" class="btn secondary">+ Apartamento</button><button id="oe-add-board" class="btn secondary">+ Quadro / Equipamento</button><button id="oe-add-component" class="btn secondary">+ Componente</button><button id="oe-edit-work" class="btn secondary">Editar dados da obra</button><button id="oe-save" class="btn primary">Salvar</button></div>
             <div id="oe-floors" class="oe-floors"></div>
           </div>
         </div>

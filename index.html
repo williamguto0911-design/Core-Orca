@@ -29,7 +29,7 @@
         <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
         <button class="nav-item" data-page="materiais" data-module="materiais">Materiais</button>
         <button class="nav-item" data-page="lista-materiais" data-module="lista_materiais">Lista de Materiais</button>
-        <button class="nav-item" data-page="unifilar" data-module="unifilar">Esquema Unifilar</button>
+        <button class="nav-item" data-page="unifilar" data-module="unifilar">Projeto Elétrico</button>
         <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
         <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
         <button class="nav-item" data-page="reposicao-estoque" data-module="estoque">Reposição de Estoque</button>
@@ -112,7 +112,7 @@
           <input id="lista-material-search" placeholder="Pesquisar lista, cliente ou vínculo...">
           <button id="nova-lista-material" class="btn primary">+ Lista de Materiais</button>
         </div>
-        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Data</th><th>Cliente</th><th>Responsável</th><th>Vínculo</th><th>Itens</th><th>Total</th><th></th></tr></thead><tbody id="listas-materiais-table"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th>Nome</th><th>Data</th><th>Cliente</th><th>Responsável</th><th>Vínculo</th><th>Itens</th><th></th></tr></thead><tbody id="listas-materiais-table"></tbody></table></div>
       </section>
 
       <section id="page-servicos" class="page hidden">
@@ -248,35 +248,15 @@
 
 
       <section id="page-unifilar" class="page hidden">
-        <div class="panel unifilar-panel uf-dark">
-          <div class="uf-toolbar">
-            <div class="uf-brand"><b>CORE ORÇA · ESQUEMA UNIFILAR</b><span class="uf-standard">Editor técnico vetorial</span></div>
-            <div class="action-group"><button id="unifilar-save" class="btn secondary">Salvar</button><button id="unifilar-pdf" class="btn secondary">Exportar PDF</button><button id="unifilar-materials" class="btn secondary">Lista de Materiais</button></div>
+        <div class="panel obra-eletrica-page">
+          <div class="oe-head"><div><h2>Projeto Elétrico da Obra</h2><p>Cadastre a estrutura da obra por pavimento e vincule cada componente aos materiais do banco.</p></div><div class="action-group"><button id="oe-new" class="btn primary">+ Nova obra elétrica</button><button id="oe-open" class="btn secondary">Abrir</button><button id="oe-materials" class="btn secondary">Gerar Lista de Materiais</button><button id="oe-pdf" class="btn secondary">Esquema por pavimentos</button></div></div>
+          <div id="oe-empty" class="oe-empty"><b>Nenhuma obra elétrica aberta.</b><span>Crie uma obra ou abra um cadastro existente.</span></div>
+          <div id="oe-work" class="hidden">
+            <div class="oe-summary"><div><small>OBRA</small><b id="oe-title">-</b></div><div><small>CLIENTE</small><b id="oe-client">-</b></div><div><small>PAVIMENTOS</small><b id="oe-floor-count">0</b></div><div><small>ITENS</small><b id="oe-item-count">0</b></div></div>
+            <div class="oe-options"><b>O que existe na obra?</b><label><input type="checkbox" data-oe-option="subestacao"> Subestação</label><label><input type="checkbox" data-oe-option="lazer"> Lazer</label><label><input type="checkbox" data-oe-option="gerador"> Gerador</label><label><input type="checkbox" data-oe-option="barramento_blindado"> Barramento blindado</label></div>
+            <div class="oe-toolbar"><button id="oe-add-floor" class="btn primary">+ Pavimento</button><button id="oe-add-apartment" class="btn secondary">+ Apartamento</button><button id="oe-add-board" class="btn secondary">+ Quadro / Equipamento</button><button id="oe-add-component" class="btn secondary">+ Componente</button><button id="oe-save" class="btn primary">Salvar</button></div>
+            <div id="oe-floors" class="oe-floors"></div>
           </div>
-          <div class="uf-cad-toolbar">
-            <button id="uf-mode-select" class="uf-cad-tool active" title="Selecionar">↖ <span>Selecionar</span></button>
-            <button id="uf-mode-connect" class="uf-cad-tool" title="Ligar componentes">⌁ <span>Ligar</span></button>
-            <button id="uf-delete-selected" class="uf-cad-tool" title="Apagar selecionado">⌫ <span>Apagar</span></button>
-            <button id="uf-rotate-selected" class="uf-cad-tool" title="Girar 90°">↻ <span>Girar</span></button>
-            <span class="uf-tool-sep"></span>
-            <button id="unifilar-new" class="uf-cad-tool">＋ <span>Novo</span></button><button id="unifilar-open" class="uf-cad-tool">▣ <span>Abrir</span></button><button id="unifilar-organize" class="uf-cad-tool">▦ <span>Organizar</span></button>
-            <span class="uf-tool-sep"></span>
-            <label class="uf-wire-label">Condutor <select id="uf-wire-type"><option value="fase">Fase R</option><option value="fase_s">Fase S</option><option value="fase_t">Fase T</option><option value="neutro">Neutro N</option><option value="terra">Terra PE</option></select></label>
-          </div>
-          <div class="unifilar-meta"><input id="unifilar-name" placeholder="Nome do esquema"><select id="unifilar-system"><option value="mono">Monofásico</option><option value="bi">Bifásico</option><option value="tri">Trifásico</option></select><select id="unifilar-vinculo-tipo"><option value="">Sem vínculo</option><option value="orcamento">Orçamento</option><option value="os">Ordem de Serviço</option><option value="lista_materiais">Lista de Materiais</option></select><select id="unifilar-vinculo-id"><option value="">Selecione...</option></select><button id="unifilar-import-materials" class="btn secondary">Importar materiais</button></div>
-          <div class="unifilar-workspace">
-            <aside class="unifilar-palette">
-              <div class="uf-palette-tabs"><b>Componentes</b><span>Símbolos</span><span>Personalizados</span></div><div class="uf-insert-hint">Selecione um componente e clique no desenho para inserir.</div><input id="uf-search" class="uf-search" placeholder="Buscar componente...">
-              <div class="uf-group"><b>ALIMENTAÇÃO / MEDIÇÃO</b><button data-uf-type="entrada">Rede / Entrada</button><button data-uf-type="medidor">Medidor</button><button data-uf-type="transformador">Transformador</button><button data-uf-type="gerador">Gerador</button></div>
-              <div class="uf-group"><b>QUADROS E BARRAMENTOS</b><button data-uf-type="quadro">Quadro</button><button data-uf-type="barramento">Barramento</button><button data-uf-type="pente">Barramento pente</button><button data-uf-type="barramento_n">Barramento N</button><button data-uf-type="terra">Barramento PE</button></div>
-              <div class="uf-group"><b>PROTEÇÃO</b><button data-uf-type="disjuntor">Disjuntor</button><button data-uf-type="idr">IDR (DR)</button><button data-uf-type="dps">DPS</button><button data-uf-type="fusivel">Fusível</button><button data-uf-type="seccionadora">Chave seccionadora</button></div>
-              <div class="uf-group"><b>CIRCUITOS E CARGAS</b><button data-uf-type="circuito">Circuito / Carga</button><button data-uf-type="tomada">Tomada</button><button data-uf-type="iluminacao">Iluminação</button><button data-uf-type="motor">Motor</button></div>
-              <div class="uf-group"><b>PERSONALIZADOS</b><div id="uf-custom-list"></div><button id="uf-create-symbol" class="uf-create-symbol">＋ Criar novo símbolo</button></div>
-            </aside>
-            <div class="uf-canvas-wrap"><div class="uf-canvas-tabs"><button data-uf-system="mono">Monofásico</button><button data-uf-system="bi">Bifásico</button><button data-uf-system="tri">Trifásico</button></div><div id="unifilar-canvas" class="unifilar-canvas"><svg id="unifilar-lines"></svg><div id="unifilar-nodes"></div></div></div>
-            <aside id="unifilar-properties" class="unifilar-properties"><div class="uf-side-title">Propriedades</div><p class="muted">Selecione um componente.</p></aside>
-          </div>
-          <div class="unifilar-footer"><span id="unifilar-summary">Potência: 0 W • Corrente calculada: 0 A</span><span id="uf-mode-status">Modo: Selecionar</span></div>
         </div>
       </section>
 

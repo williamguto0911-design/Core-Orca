@@ -256,43 +256,6 @@ async function loadRecibos(){const {data,error}=await sb.from("recibos").select(
 async function loadListasMateriais(){const {data,error}=await sb.from("listas_materiais").select("*,clientes(nome),orcamentos(numero),recibos!listas_materiais_recibo_id_fkey(numero),ordens_servico(numero),lista_materiais_itens(id)").order("created_at",{ascending:false});if(error){listasMateriais=[];console.warn("Listas de materiais:",error.message);return}listasMateriais=data||[]}
 async function loadCargos(){const {data,error}=await sb.from("cargos").select("*").order("nome");if(error){cargos=[];return}cargos=data||[]}
 async function loadSaasAdmin(){const [{data,error},{data:mods,error:me}]=await Promise.all([sb.rpc("admin_list_empresas"),sb.rpc("admin_get_empresa_modulos_v040")]);if(error){empresasSaas=[];return}const mm=Object.fromEntries((mods||[]).map(x=>[x.empresa_id,x.modulos||{}]));empresasSaas=(data||[]).map(x=>({...x,modulos_ativos:mm[x.id]||{}}));if(me)console.warn("Módulos:",me.message)}
-const NOTIFICATION_TYPES=[
- {key:"estoque_baixo",label:"Estoque baixo"},
- {key:"financeiro_vencido",label:"Financeiro vencido"},
- {key:"financeiro_vencimento",label:"Vencimentos financeiros próximos"},
- {key:"agenda_dia",label:"Compromissos da agenda"},
- {key:"licenca_vencimento",label:"Licença próxima do vencimento"},
- {key:"orcamento",label:"Orçamentos"},
- {key:"ordem_servico",label:"Ordens de Serviço"},
- {key:"compras",label:"Compras"}
-];
-let notificationSettings=[];
-async function loadNotificationSettings(userId){
- if(!userId){notificationSettings=[];return}
- const {data,error}=await sb.from("usuario_notificacoes_config").select("*").eq("usuario_empresa_id",userId);
- if(error){console.warn("Notificações:",error.message);notificationSettings=[];return}
- notificationSettings=data||[];
-}
-function renderNotificationSettings(){
- const sel=$("notif-user"),body=$("notif-settings-body");if(!sel||!body)return;
- const activeUsers=(usuarios||[]).filter(u=>u.ativo!==false);
- const current=sel.value||currentUserProfile?.usuario_empresa_id||activeUsers[0]?.id||"";
- sel.innerHTML=activeUsers.map(u=>`<option value="${u.id}" ${u.id===current?"selected":""}>${esc(u.nome||u.email)} — ${esc(u.email||"")}</option>`).join("");
- const map=Object.fromEntries((notificationSettings||[]).map(x=>[x.tipo,x]));
- body.innerHTML=NOTIFICATION_TYPES.map(n=>{const x=map[n.key]||{};return `<tr><td><b>${esc(n.label)}</b></td><td><input type="checkbox" data-notif-app="${n.key}" ${x.no_sistema!==false?"checked":""}></td><td><input type="checkbox" data-notif-email="${n.key}" ${x.por_email?"checked":""}></td></tr>`}).join("");
-}
-async function openNotificationSettings(userId){
- const id=userId||$("notif-user")?.value||currentUserProfile?.usuario_empresa_id||usuarios?.[0]?.id;if(!id)return;
- await loadNotificationSettings(id);renderNotificationSettings();
-}
-async function saveNotificationSettings(){
- const userId=$("notif-user")?.value;if(!userId)return toast("Selecione um usuário");
- const rows=NOTIFICATION_TYPES.map(n=>({usuario_empresa_id:userId,tipo:n.key,no_sistema:!!document.querySelector(`[data-notif-app="${n.key}"]`)?.checked,por_email:!!document.querySelector(`[data-notif-email="${n.key}"]`)?.checked}));
- const {error}=await sb.from("usuario_notificacoes_config").upsert(rows,{onConflict:"usuario_empresa_id,tipo"});if(error)return toast(error.message);
- await loadNotificationSettings(userId);toast("Notificações salvas");
-}
-
-async function testNotificationEmail(){const userId=$("notif-user")?.value;if(!userId)return toast("Selecione um usuário");const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"test-notification-email",usuario_id:userId}});if(error||data?.error)return toast("Erro no envio: "+await edgeFunctionError(error,data));toast("E-mail de teste enviado para "+(data.email||"o usuário"))}
 function refreshNavGroups(){
  document.querySelectorAll(".nav-group").forEach(g=>{
    const visible=[...g.querySelectorAll(".nav-subitem")].some(x=>!x.classList.contains("hidden"));
@@ -371,7 +334,6 @@ function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
   refreshNavGroups();
-  if(page==="notificacoes")setTimeout(()=>openNotificationSettings(),0);
   $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Vertical",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
@@ -557,6 +519,8 @@ function renderAlerts(){
  if(overdue.length)alerts.push({type:"danger",title:`${overdue.length} lançamento(s) financeiro(s) vencido(s)`,text:`Total vencido: ${money(overdue.reduce((s,f)=>s+Number(f.valor),0))}`});
  const soon=financeiro.filter(f=>f.status==="pendente"&&f.vencimento&&f.vencimento>=todayStr&&f.vencimento<=in7s);
  if(soon.length)alerts.push({type:"info",title:`${soon.length} vencimento(s) nos próximos 7 dias`,text:`Total: ${money(soon.reduce((s,f)=>s+Number(f.valor),0))}`});
+ const recibosAbertos=recibos.filter(r=>!["pago","cancelado"].includes(String(r.status||"").toLowerCase()) && Number(r.total||0)>Number(r.valor_pago||0));
+ if(recibosAbertos.length)alerts.push({type:"info",title:`${recibosAbertos.length} recibo(s) com saldo pendente`,text:`Saldo total: ${money(recibosAbertos.reduce((sum,r)=>sum+Math.max(0,Number(r.total||0)-Number(r.valor_pago||0)),0))}`});
  const ag=agenda.filter(a=>a.status!=="cancelado"&&a.status!=="concluido"&&String(a.inicio).slice(0,10)===todayStr);
  if(ag.length)alerts.push({type:"info",title:`${ag.length} compromisso(s) hoje`,text:ag.slice(0,4).map(a=>a.titulo).join(", ")});
  box.innerHTML=alerts.map(a=>`<div class="alert-item ${a.type}"><strong>${esc(a.title)}</strong><span>${esc(a.text)}</span></div>`).join("")||'<div class="alert-item"><strong>Nenhum alerta crítico</strong><span>Estoque, agenda e financeiro sem alertas para exibir.</span></div>';
@@ -1414,8 +1378,6 @@ $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{i
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("lista-material-search").oninput=renderListasMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
 $("recibo-search").oninput=renderRecibos;$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{navigate(b.dataset.page)});initHierarchicalNav();
-if($("notif-user"))$("notif-user").onchange=e=>openNotificationSettings(e.target.value);
-if($("notif-save"))$("notif-save").onclick=saveNotificationSettings;if($("notif-test"))$("notif-test").onclick=testNotificationEmail;
 
 
 /* V26 — Lista de Materiais */
@@ -1834,9 +1796,6 @@ async function saveListaMaterial(e,id){e.preventDefault();if(!listaMaterialItens
 async function viewListaMaterial(id){const x=await getListaMaterial(id);if(!x)return;const show=!!x.lista.exibir_valores,groups=x.lista.topicos?.length?x.lista.topicos:[...new Set(x.itens.map(i=>i.topico||'Geral'))],total=x.itens.reduce((a,i)=>a+Number(i.quantidade||0)*Number(i.valor_unitario||0),0);openModal(x.lista.nome,`${groups.map(t=>`<section class="lm-view-topic"><h4>${esc(t)}</h4>${x.itens.filter(i=>(i.topico||'Geral')===t).map(i=>`<div class="lm-view-row ${show?'with-values':''}"><div><b>${esc(i.descricao)}</b>${i.observacoes?`<small>${richDisplay(i.observacoes)}</small>`:''}</div><span>${Number(i.quantidade).toLocaleString('pt-BR')} ${esc(i.unidade)}</span>${show?`<span>${money(i.valor_unitario)}</span><strong>${money(Number(i.quantidade)*Number(i.valor_unitario))}</strong>`:''}</div>`).join('')}</section>`).join('')}${show?`<div class="lm-view-total">Valor total: ${money(total)}</div>`:''}<div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn primary" onclick="printListaMaterial('${id}')">PDF / Imprimir</button></div>`)}
 async function printListaMaterial(id){const x=await getListaMaterial(id);if(!x)return;const l=x.lista,show=!!l.exibir_valores,topics=(l.topicos?.length?l.topicos:[...new Set(x.itens.map(i=>i.topico||'Geral'))]),cli=l.clientes,w=window.open('','_blank');if(!w)return toast('Permita pop-ups para gerar o PDF.');const total=x.itens.reduce((a,i)=>a+Number(i.quantidade||0)*Number(i.valor_unitario||0),0);const cols=show?'1fr 105px 95px 105px':'1fr 125px';w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(l.nome)}</title><style>@page{size:A4;margin:12mm 13mm 14mm}*{box-sizing:border-box}body{font:10px Arial;color:#172033;margin:0}.doc{max-width:190mm;margin:auto}.top{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:11px;border-bottom:2px solid #1f4fd6}.brand{display:flex;gap:10px;align-items:center}.brand-logo{max-width:145px;max-height:52px}.brand-mark{width:40px;height:40px;border-radius:9px;background:#1f4fd6;color:#fff;display:flex;align-items:center;justify-content:center}.company h1{font-size:16px;margin:0}.company p{font-size:8.5px;color:#667085;margin:2px 0}.doc-title{text-align:right}.doc-title .type{font-size:8px;text-transform:uppercase;color:#667085;letter-spacing:1px}.doc-title h2{font-size:18px;color:#1f4fd6;margin:3px 0}.client-data{border:1px solid #d0d5dd;border-radius:7px;padding:8px;margin:10px 0;break-inside:avoid}.client-data-title{font-size:9px;font-weight:700;text-transform:uppercase;color:#1f4fd6;margin-bottom:5px}.client-data-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px 12px}.client-data p{margin:2px 0;font-size:8.5px}.client-subtitle{font-size:8px;font-weight:700;margin-top:6px;color:#475467}.info{display:grid;grid-template-columns:2fr 1fr 1fr;gap:7px;margin:10px 0}.info div{border:1px solid #e4e9f2;border-radius:7px;padding:7px;background:#f8fafc}.info small{display:block;color:#667085;text-transform:uppercase;font-size:7.5px}.topic{margin:12px 0}.topic h2{font-size:11px;text-transform:uppercase;color:#344054;background:#f2f5fa;border-left:3px solid #1f4fd6;padding:6px 8px;margin:0;break-after:avoid}.table{border:1px solid #d0d5dd;border-radius:6px;overflow:hidden}.thead,.row{display:grid;grid-template-columns:${cols}}.thead{font-size:8px;text-transform:uppercase;text-align:center;font-weight:700;border-bottom:1px solid #98a2b3}.thead span{padding:5px}.thead span+span,.cell{border-left:1px solid #d0d5dd}.row{min-height:42px;border-bottom:1px solid #e4e7ec;break-inside:avoid;page-break-inside:avoid}.row:last-child{border-bottom:0}.mat{padding:7px 9px}.mat b{display:block;font-size:10.5px}.mat small{display:block;font-size:8.5px;font-style:italic;line-height:1.35;margin-top:3px;color:#344054}.cell{display:flex;align-items:center;justify-content:center;padding:7px;text-align:center}.total{display:flex;justify-content:flex-end;font-size:12px;font-weight:700;margin:10px 0;break-inside:avoid}.notes{margin-top:12px;border-top:1px solid #e4e9f2;padding-top:7px;color:#667085;font-size:8.5px}.footer{margin-top:16px;padding-top:7px;border-top:1px solid #e4e9f2;color:#98a2b3;font-size:7.5px;display:flex;justify-content:space-between;break-inside:avoid}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><div class="doc">${printBrandHeader(l.nome,'Lista de Materiais')}${clientePDFHTML(cli)}<div class="info"><div><small>Cliente</small><b>${esc(cli?.nome||'-')}</b></div><div><small>Data</small><b>${new Date(l.data_lista+'T12:00:00').toLocaleDateString('pt-BR')}</b></div><div><small>Responsável</small><b>${esc(l.responsavel_emissao||'-')}</b></div></div>${topics.map(t=>{const its=x.itens.filter(i=>(i.topico||'Geral')===t);if(!its.length)return '';return `<section class="topic"><h2>${esc(t)}</h2><div class="table"><div class="thead"><span>Material</span><span>Quantidade</span>${show?'<span>Valor unit.</span><span>Total</span>':''}</div>${its.map(i=>`<div class="row"><div class="mat"><b>${esc(i.descricao)}</b>${i.observacoes?`<small>${richDisplay(i.observacoes)}</small>`:''}</div><div class="cell">${Number(i.quantidade).toLocaleString('pt-BR')} ${esc(i.unidade)}</div>${show?`<div class="cell">${money(i.valor_unitario)}</div><div class="cell">${money(Number(i.quantidade)*Number(i.valor_unitario))}</div>`:''}</div>`).join('')}</div></section>`}).join('')}${show?`<div class="total">Valor total: ${money(total)}</div>`:''}${l.observacoes?`<div class="notes"><b>Observações:</b> ${richDisplay(l.observacoes)}</div>`:''}<div class="footer"><span>${esc(empresa?.rodape_documentos||'Documento emitido pelo Core Orça')}</span><span>Emitido em ${new Date().toLocaleString('pt-BR')}</span></div></div><script>onload=()=>setTimeout(()=>print(),400)<\/script></body></html>`);w.document.close()}
 
-// Esqueci minha senha: solicita senha temporária por e-mail pela Edge Function.
-async function solicitarSenhaTemporaria(){const email=$('login-email').value.trim().toLowerCase();if(!email){$('login-error').textContent='Informe seu e-mail.';return}$('login-error').textContent='Enviando senha temporária...';const {data,error}=await sb.functions.invoke('core-orca-admin-users',{body:{action:'forgot-password-email',email}});$('login-error').textContent=(error||data?.error)?('Não foi possível enviar: '+await edgeFunctionError(error,data)):(data?.message||'Se o e-mail estiver cadastrado, uma senha temporária será enviada.')}
-if($('forgot-password-btn'))$('forgot-password-btn').onclick=solicitarSenhaTemporaria;
 
 // Bind do novo módulo
 setTimeout(()=>{if($('oe-new'))$('oe-new').onclick=novaObraEletrica;if($('oe-open'))$('oe-open').onclick=abrirObraEletrica;if($('oe-add-floor'))$('oe-add-floor').onclick=()=>adicionarPavimento();if($('oe-add-apartment'))$('oe-add-apartment').onclick=()=>adicionarEstrutura('apartamento');if($('oe-add-board'))$('oe-add-board').onclick=()=>adicionarEstrutura('quadro');if($('oe-add-component'))$('oe-add-component').onclick=()=>adicionarComponente();if($('oe-edit-work'))$('oe-edit-work').onclick=editarObraEletrica;if($('oe-delete-work'))$('oe-delete-work').onclick=excluirObraEletrica;if($('oe-save'))$('oe-save').onclick=salvarOpcoesObra;if($('oe-materials'))$('oe-materials').onclick=gerarListaMateriaisObra;if($('oe-pdf'))$('oe-pdf').onclick=imprimirEsquemaPavimentos},0);

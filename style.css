@@ -279,3 +279,21 @@
 .nav-group.group-hidden{display:none!important}
 .notification-settings-panel{max-width:1000px}.notification-user-row{max-width:480px;margin:14px 0 18px}.notification-user-row label{display:grid;gap:6px;font-size:13px;font-weight:700}
 .notification-table{min-width:650px}.notification-table th:nth-child(2),.notification-table th:nth-child(3),.notification-table td:nth-child(2),.notification-table td:nth-child(3){width:150px;text-align:center}.notification-table input[type=checkbox]{width:18px;height:18px}
+
+/* V052.2 — campos de observação e lista de materiais */
+.modal-card textarea,.form-grid textarea,.lm-full-observation textarea,.lm-obs-add textarea{width:100%!important;max-width:100%!important;box-sizing:border-box;display:block;resize:vertical}
+.lm-full-observation{width:100%;min-width:0}.lm-check{display:flex!important;align-items:center;gap:9px}.lm-check input{width:18px!important;height:18px;flex:0 0 auto}.lm-check span{font-weight:600}
+.lm-item.with-values{grid-template-columns:26px minmax(280px,1fr) 130px 120px 120px 180px}.lm-value{text-align:right;font-variant-numeric:tabular-nums}.lm-inline-editor textarea{width:100%!important}
+@media(max-width:1000px){.lm-item.with-values{grid-template-columns:24px 1fr}.lm-item.with-values>*:not(.drag-handle):not(.lm-item-desc){grid-column:2}.lm-value{text-align:left}}
+
+/* V052.3 — refinamentos de popups, observações e opções do Esquema Vertical */
+.lm-link-actions{display:flex;align-items:end}.lm-link-actions .btn{width:100%;min-height:42px}
+#modal .modal-card textarea,.rich-editor-wrap{width:100%;max-width:100%;box-sizing:border-box}
+#modal .modal-card:has(#lista-material-form){width:min(1280px,calc(100vw - 28px));max-width:1280px}
+#modal .modal-card:has(#lista-material-form) .form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.oe-popup-section{margin:14px 0;padding:16px;border:1px solid #dbe3ee;border-radius:12px;background:#f8fafc}.oe-popup-section h4{margin:0 0 12px}
+.oe-popup-section .oe-choice-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+.oe-popup-section .oe-choice-grid label{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;min-height:48px!important;padding:10px 12px!important;border:1px solid #dbe3ee!important;border-radius:9px!important;background:#fff!important;line-height:1.25!important;text-align:left!important}
+.oe-popup-section .oe-choice-grid input[type=checkbox]{width:18px!important;height:18px!important;min-width:18px!important;margin:0!important;flex:0 0 18px!important}
+@media(max-width:760px){#modal .modal-card:has(#lista-material-form) .form-grid,.oe-popup-section .oe-choice-grid{grid-template-columns:1fr!important}}
+.lm-view-row.with-values{grid-template-columns:minmax(0,1fr) 130px 110px 120px;gap:8px}.lm-view-row.with-values>span,.lm-view-row.with-values>strong{text-align:right}.lm-view-total{text-align:right;font-size:16px;font-weight:800;padding:12px 0}

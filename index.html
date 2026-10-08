@@ -24,28 +24,54 @@
   <div id="app" class="app hidden">
     <aside id="sidebar" class="sidebar">
       <div class="brand"><span>⚡</span><div><b>Core Orça</b><small>Manutenção Elétrica</small></div></div>
-      <nav>
+      <nav id="main-nav">
         <button class="nav-item active" data-page="dashboard">Dashboard</button>
         <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
-        <button class="nav-item" data-page="materiais" data-module="materiais">Materiais</button>
-        <button class="nav-item" data-page="lista-materiais" data-module="lista_materiais">Lista de Materiais</button>
         <button class="nav-item" data-page="unifilar" data-module="unifilar">Esquema Vertical</button>
-        <button class="nav-item" data-page="servicos" data-module="servicos">Serviços</button>
-        <button class="nav-item" data-page="estoque" data-module="estoque">Estoque</button>
-        <button class="nav-item" data-page="reposicao-estoque" data-module="estoque">Reposição de Estoque</button>
-        <button class="nav-item" data-page="orcamentos" data-module="orcamentos">Orçamentos</button>
-        <button class="nav-item" data-page="os" data-module="os">Ordens de Serviço</button>
-        <button class="nav-item" data-page="agenda" data-module="agenda">Agenda</button>
-        <button class="nav-item" data-page="financeiro" data-module="financeiro">Financeiro</button>
-        <button class="nav-item" data-page="recibos" data-module="recibos">Recibos</button>
-        <button class="nav-item" data-page="tecnicos" data-module="tecnicos">Técnicos</button>
-        <button class="nav-item" data-page="fornecedores" data-module="fornecedores">Fornecedores</button>
-        <button class="nav-item" data-page="compras" data-module="compras">Compras</button>
-        <button class="nav-item" data-page="relatorios" data-module="relatorios">Relatórios</button>
-        <button class="nav-item manager-only" data-page="usuarios">Usuários</button>
-        <button class="nav-item manager-only" data-page="cargos">Cargos e Permissões</button>
+
+        <div class="nav-group" data-nav-group="materiais">
+          <button type="button" class="nav-group-toggle"><span>Materiais</span><span class="nav-chevron">›</span></button>
+          <div class="nav-submenu">
+            <button class="nav-item nav-subitem" data-page="materiais" data-module="materiais">Materiais</button>
+            <button class="nav-item nav-subitem" data-page="lista-materiais" data-module="lista_materiais">Lista de Materiais</button>
+            <button class="nav-item nav-subitem" data-page="estoque" data-module="estoque">Estoque</button>
+            <button class="nav-item nav-subitem" data-page="reposicao-estoque" data-module="estoque">Reposição de Estoque</button>
+            <button class="nav-item nav-subitem" data-page="fornecedores" data-module="fornecedores">Fornecedores</button>
+            <button class="nav-item nav-subitem" data-page="compras" data-module="compras">Compras</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group="servicos">
+          <button type="button" class="nav-group-toggle"><span>Serviços</span><span class="nav-chevron">›</span></button>
+          <div class="nav-submenu">
+            <button class="nav-item nav-subitem" data-page="servicos" data-module="servicos">Serviços</button>
+            <button class="nav-item nav-subitem" data-page="orcamentos" data-module="orcamentos">Orçamentos</button>
+            <button class="nav-item nav-subitem" data-page="os" data-module="os">Ordens de Serviço</button>
+            <button class="nav-item nav-subitem" data-page="agenda" data-module="agenda">Agenda</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group="financeiro">
+          <button type="button" class="nav-group-toggle"><span>Financeiro</span><span class="nav-chevron">›</span></button>
+          <div class="nav-submenu">
+            <button class="nav-item nav-subitem" data-page="recibos" data-module="recibos">Recibos</button>
+            <button class="nav-item nav-subitem" data-page="financeiro" data-module="financeiro">Financeiro</button>
+            <button class="nav-item nav-subitem" data-page="relatorios" data-module="relatorios">Relatórios</button>
+          </div>
+        </div>
+
+        <div class="nav-group" data-nav-group="configuracoes">
+          <button type="button" class="nav-group-toggle"><span>Configurações</span><span class="nav-chevron">›</span></button>
+          <div class="nav-submenu">
+            <button class="nav-item nav-subitem" data-page="tecnicos" data-module="tecnicos">Técnicos</button>
+            <button class="nav-item nav-subitem manager-only" data-page="cargos">Cargos e Permissões</button>
+            <button class="nav-item nav-subitem" data-page="configuracoes" data-module="configuracoes">Configurações</button>
+            <button class="nav-item nav-subitem manager-only" data-page="usuarios">Usuários</button>
+            <button class="nav-item nav-subitem manager-only" data-page="notificacoes">Notificações</button>
+          </div>
+        </div>
+
         <button class="nav-item platform-only hidden" data-page="admin-plataforma">Empresas e Licenças</button>
-        <button class="nav-item" data-page="configuracoes" data-module="configuracoes">Configurações</button>
       </nav>
       <div class="sidebar-footer">
         <small id="user-email"></small>
@@ -248,15 +274,30 @@
 
 
       <section id="page-unifilar" class="page hidden">
-        <div class="panel obra-eletrica-page">
-          <div class="oe-head"><div><h2>Esquema Vertical</h2><p>Cadastre pavimentos, quadros, equipamentos e materiais da instalação. O sistema organiza a obra por pavimento e gera a relação de materiais.</p></div><div class="action-group"><button id="oe-new" class="btn primary">+ Novo esquema vertical</button><button id="oe-open" class="btn secondary">Abrir</button><button id="oe-materials" class="btn secondary">Gerar Lista de Materiais</button><button id="oe-pdf" class="btn secondary">PDF do Esquema Vertical</button></div></div>
-          <div id="oe-empty" class="oe-empty"><b>Nenhum esquema vertical aberto.</b><span>Crie um esquema ou abra uma obra cadastrada.</span></div>
+        <div class="panel obra-eletrica-page oe-v052">
+          <div class="oe-head">
+            <div><div class="oe-kicker">INSTALAÇÃO ELÉTRICA</div><h2>Esquema Vertical</h2><p>Organize a obra por pavimentos, locais, quadros e componentes vinculados ao banco de materiais.</p></div>
+            <div class="oe-head-actions"><button id="oe-new" class="btn primary">+ Novo</button><button id="oe-open" class="btn secondary">Abrir obra</button></div>
+          </div>
+          <div id="oe-empty" class="oe-empty"><div class="oe-empty-icon">▥</div><b>Nenhum esquema vertical aberto</b><span>Crie uma nova obra ou abra um esquema existente para começar.</span><div class="oe-empty-actions"><button class="btn primary" data-oe-main="new">+ Novo esquema</button><button class="btn secondary" data-oe-main="open">Abrir esquema</button></div></div>
           <div id="oe-work" class="hidden">
-            <div class="oe-summary"><div><small>OBRA</small><b id="oe-title">-</b></div><div><small>CLIENTE</small><b id="oe-client">-</b></div><div><small>PAVIMENTOS</small><b id="oe-floor-count">0</b></div><div><small>ITENS</small><b id="oe-item-count">0</b></div></div>
-            <div class="oe-options"><b>O que existe na obra?</b><label><input type="checkbox" data-oe-option="subestacao"> Subestação</label><label><input type="checkbox" data-oe-option="lazer"> Lazer</label><label><input type="checkbox" data-oe-option="gerador"> Gerador</label><label><input type="checkbox" data-oe-option="barramento_blindado"> Barramento blindado</label></div>
-            <div class="oe-toolbar"><button id="oe-add-floor" class="btn primary">+ Pavimento</button><button id="oe-add-apartment" class="btn secondary">+ Apartamento</button><button id="oe-add-board" class="btn secondary">+ Quadro / Equipamento</button><button id="oe-add-component" class="btn secondary">+ Componente</button><button id="oe-edit-work" class="btn secondary">Editar dados da obra</button><button id="oe-delete-work" class="btn danger">Excluir obra</button><button id="oe-save" class="btn primary">Salvar</button></div>
+            <div class="oe-summary"><div><small>OBRA</small><b id="oe-title">-</b></div><div><small>CLIENTE</small><b id="oe-client">-</b></div><div><small>PAVIMENTOS</small><b id="oe-floor-count">0</b></div><div><small>COMPONENTES</small><b id="oe-item-count">0</b></div></div>
+            <div class="oe-commandbar">
+              <div class="oe-command-group"><span>CADASTRAR</span><button id="oe-add-floor" class="btn primary">+ Pavimento</button><button id="oe-add-apartment" class="btn secondary">+ Apartamento</button><button id="oe-add-board" class="btn secondary">+ Quadro / Equipamento</button><button id="oe-add-component" class="btn secondary">+ Componente</button></div>
+              <div class="oe-command-group oe-command-right"><span>DOCUMENTOS</span><button id="oe-materials" class="btn secondary">Lista de Materiais</button><button id="oe-pdf" class="btn secondary">PDF</button></div>
+            </div>
+            <div class="oe-config-row"><div class="oe-options"><b>Características da obra</b><label><input type="checkbox" data-oe-option="subestacao"> Subestação</label><label><input type="checkbox" data-oe-option="lazer"> Lazer</label><label><input type="checkbox" data-oe-option="gerador"> Gerador</label><label><input type="checkbox" data-oe-option="barramento_blindado"> Barramento blindado</label></div><div class="oe-work-actions"><button id="oe-edit-work" class="action-btn">Editar obra</button><button id="oe-save" class="action-btn">Salvar opções</button><button id="oe-delete-work" class="action-btn danger">Excluir obra</button></div></div>
             <div id="oe-floors" class="oe-floors"></div>
           </div>
+        </div>
+      </section>
+
+      <section id="page-notificacoes" class="page hidden manager-only">
+        <div class="panel config-panel notification-settings-panel">
+          <div class="page-header"><div><h1>Notificações</h1><p>Defina quais avisos os usuários da empresa recebem no Core Orça e também por e-mail.</p></div></div>
+          <div class="notification-user-row"><label>Usuário<select id="notif-user"></select></label></div>
+          <div class="table-wrap notification-table-wrap"><table class="notification-table"><thead><tr><th>Notificação</th><th>No sistema</th><th>Por e-mail</th></tr></thead><tbody id="notif-settings-body"></tbody></table></div>
+          <div class="modal-actions"><button id="notif-save" class="btn primary" type="button">Salvar notificações</button></div>
         </div>
       </section>
 

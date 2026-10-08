@@ -67,6 +67,7 @@
             <button class="nav-item nav-subitem manager-only" data-page="cargos">Cargos e Permissões</button>
             <button class="nav-item nav-subitem" data-page="configuracoes" data-module="configuracoes">Configurações</button>
             <button class="nav-item nav-subitem manager-only" data-page="usuarios">Usuários</button>
+            <button class="nav-item nav-subitem manager-only" data-page="notificacoes">Notificações</button>
           </div>
         </div>
 
@@ -291,7 +292,14 @@
         </div>
       </section>
 
-
+      <section id="page-notificacoes" class="page hidden manager-only">
+        <div class="panel config-panel notification-settings-panel">
+          <div class="page-header"><div><h1>Notificações</h1><p>Defina quais avisos os usuários da empresa recebem no Core Orça e também por e-mail.</p></div></div>
+          <div class="notification-user-row"><label>Usuário<select id="notif-user"></select></label></div>
+          <div class="table-wrap notification-table-wrap"><table class="notification-table"><thead><tr><th>Notificação</th><th>No sistema</th><th>Por e-mail</th></tr></thead><tbody id="notif-settings-body"></tbody></table></div>
+          <div class="modal-actions"><button id="notif-save" class="btn primary" type="button">Salvar notificações</button></div>
+        </div>
+      </section>
 
       <section id="page-configuracoes" class="page hidden admin-only">
         <div class="panel config-panel">

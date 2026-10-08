@@ -151,6 +151,7 @@ async function refreshAll(){
     return;
   }
   await Promise.all([loadCompanyModules(),loadClientes(),loadMateriais(),loadServicos(),loadOrcamentos(),loadOrdens(),loadAgenda(),loadFinanceiro(),loadTecnicos(),loadFornecedores(),loadCompras(),loadUsuarios(),loadEmpresa(),loadRecibos(),loadListasMateriais(),loadCargos()]);
+  await loadDashboardNotificationSettings();
   applyPermissions();renderDashboard();renderCurrent();
   
 }
@@ -267,6 +268,22 @@ const NOTIFICATION_TYPES=[
  {key:"compras",label:"Compras"}
 ];
 let notificationSettings=[];
+let dashboardNotificationSettings=[];
+let dashboardNotificationUserId=null;
+async function loadDashboardNotificationSettings(){
+ const id=currentUserProfile?.usuario_empresa_id;
+ dashboardNotificationUserId=id||null;
+ dashboardNotificationSettings=[];
+ if(!id||currentUserProfile?.is_platform_admin)return;
+ const {data,error}=await sb.from("usuario_notificacoes_config").select("tipo,no_sistema").eq("usuario_empresa_id",id);
+ if(error){console.warn("Preferências de alertas:",error.message);return}
+ if(dashboardNotificationUserId===id)dashboardNotificationSettings=data||[];
+}
+function dashboardAlertEnabled(tipo){
+ const pref=dashboardNotificationSettings.find(x=>x.tipo===tipo);
+ return pref?.no_sistema!==false;
+}
+
 async function loadNotificationSettings(userId){
  if(!userId){notificationSettings=[];return}
  const {data,error}=await sb.from("usuario_notificacoes_config").select("*").eq("usuario_empresa_id",userId);
@@ -289,7 +306,9 @@ async function saveNotificationSettings(){
  const userId=$("notif-user")?.value;if(!userId)return toast("Selecione um usuário");
  const rows=NOTIFICATION_TYPES.map(n=>({usuario_empresa_id:userId,tipo:n.key,no_sistema:!!document.querySelector(`[data-notif-app="${n.key}"]`)?.checked,por_email:!!document.querySelector(`[data-notif-email="${n.key}"]`)?.checked}));
  const {error}=await sb.from("usuario_notificacoes_config").upsert(rows,{onConflict:"usuario_empresa_id,tipo"});if(error)return toast(error.message);
- await loadNotificationSettings(userId);toast("Notificações salvas");
+ await loadNotificationSettings(userId);
+ if(userId===currentUserProfile?.usuario_empresa_id){await loadDashboardNotificationSettings();renderDashboard()}
+ toast("Notificações salvas");
 }
 function refreshNavGroups(){
  document.querySelectorAll(".nav-group").forEach(g=>{
@@ -550,13 +569,13 @@ function renderAlerts(){
  const todayStr=today(), in7=new Date();in7.setDate(in7.getDate()+7);const in7s=in7.toISOString().slice(0,10);
  const alerts=[];
  const low=materiais.filter(m=>Number(m.estoque_atual)<=Number(m.estoque_minimo));
- if(low.length)alerts.push({type:"warning",title:`${low.length} material(is) com estoque baixo`,text:low.slice(0,4).map(m=>`${m.codigo?m.codigo+" - ":""}${m.nome}`).join(", ")+(low.length>4?"...":"")});
+ if(low.length&&dashboardAlertEnabled("estoque_baixo"))alerts.push({type:"warning",title:`${low.length} material(is) com estoque baixo`,text:low.slice(0,4).map(m=>`${m.codigo?m.codigo+" - ":""}${m.nome}`).join(", ")+(low.length>4?"...":"")});
  const overdue=financeiro.filter(f=>f.status==="pendente"&&f.vencimento&&f.vencimento<todayStr);
- if(overdue.length)alerts.push({type:"danger",title:`${overdue.length} lançamento(s) financeiro(s) vencido(s)`,text:`Total vencido: ${money(overdue.reduce((s,f)=>s+Number(f.valor),0))}`});
+ if(overdue.length&&dashboardAlertEnabled("financeiro_vencido"))alerts.push({type:"danger",title:`${overdue.length} lançamento(s) financeiro(s) vencido(s)`,text:`Total vencido: ${money(overdue.reduce((s,f)=>s+Number(f.valor),0))}`});
  const soon=financeiro.filter(f=>f.status==="pendente"&&f.vencimento&&f.vencimento>=todayStr&&f.vencimento<=in7s);
- if(soon.length)alerts.push({type:"info",title:`${soon.length} vencimento(s) nos próximos 7 dias`,text:`Total: ${money(soon.reduce((s,f)=>s+Number(f.valor),0))}`});
+ if(soon.length&&dashboardAlertEnabled("financeiro_vencimento"))alerts.push({type:"info",title:`${soon.length} vencimento(s) nos próximos 7 dias`,text:`Total: ${money(soon.reduce((s,f)=>s+Number(f.valor),0))}`});
  const ag=agenda.filter(a=>a.status!=="cancelado"&&a.status!=="concluido"&&String(a.inicio).slice(0,10)===todayStr);
- if(ag.length)alerts.push({type:"info",title:`${ag.length} compromisso(s) hoje`,text:ag.slice(0,4).map(a=>a.titulo).join(", ")});
+ if(ag.length&&dashboardAlertEnabled("agenda_dia"))alerts.push({type:"info",title:`${ag.length} compromisso(s) hoje`,text:ag.slice(0,4).map(a=>a.titulo).join(", ")});
  box.innerHTML=alerts.map(a=>`<div class="alert-item ${a.type}"><strong>${esc(a.title)}</strong><span>${esc(a.text)}</span></div>`).join("")||'<div class="alert-item"><strong>Nenhum alerta crítico</strong><span>Estoque, agenda e financeiro sem alertas para exibir.</span></div>';
 }
 function reportRange(){
@@ -1407,7 +1426,7 @@ if($("reposicao-categoria-filter"))$("reposicao-categoria-filter").onchange=rend
 if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("change",e=>{if(e.target.classList.contains("reposicao-check")){salvarEstadoReposicaoVisivel();atualizarBotaoSelecionarTodosReposicao()}});
 if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("input",e=>{if(e.target.classList.contains("reposicao-qtd")||e.target.classList.contains("reposicao-obs"))salvarEstadoReposicaoVisivel()});
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();
-$("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
+$("refresh-alerts").onclick=async()=>{await loadDashboardNotificationSettings();renderAlerts()};$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("lista-material-search").oninput=renderListasMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
 $("recibo-search").oninput=renderRecibos;$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;

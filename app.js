@@ -176,6 +176,7 @@ function renderCurrent(){
   if(currentPage==="cargos")renderCargos();
   if(currentPage==="admin-plataforma")renderSaasAdmin();
   if(currentPage==="unifilar")renderUnifilar();
+  if(currentPage==="levantamento")levInit();
 }
 async function loadCompanyModules(){ if(currentUserProfile?.is_platform_admin){companyModules={};return} const {data,error}=await sb.rpc("minha_empresa_modulos_v040"); if(error){console.warn("Módulos comerciais:",error.message);companyModules={};return} companyModules=data||{}; }
 function commercialModuleEnabled(m){return companyModules?.[m]!==false}
@@ -389,7 +390,7 @@ function navigate(page){
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
   refreshNavGroups();
   if(page==="notificacoes")setTimeout(()=>openNotificationSettings(),0);
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Vertical",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Vertical",levantamento:"Levantamento em Obra",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 

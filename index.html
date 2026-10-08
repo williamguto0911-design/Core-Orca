@@ -28,6 +28,7 @@
         <button class="nav-item active" data-page="dashboard">Dashboard</button>
         <button class="nav-item" data-page="clientes" data-module="clientes">Clientes</button>
         <button class="nav-item" data-page="unifilar" data-module="unifilar">Esquema Vertical</button>
+        <button class="nav-item" data-page="levantamento" data-module="unifilar">Levantamento em Obra</button>
 
         <div class="nav-group" data-nav-group="materiais">
           <button type="button" class="nav-group-toggle"><span>Materiais</span><span class="nav-chevron">›</span></button>
@@ -273,6 +274,7 @@
       </section>
 
 
+      <section id="page-levantamento" class="page hidden"><h2>Levantamento em Obra</h2><p class="muted">Registre fotografias, materiais e pendências vinculadas aos seus clientes e esquemas verticais.</p><div id="lev-conteudo"></div></section>
       <section id="page-unifilar" class="page hidden">
         <div class="panel obra-eletrica-page oe-v052">
           <div class="oe-head">
@@ -342,5 +344,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/signature_pad@5.0.4/dist/signature_pad.umd.min.js"></script>
   <script src="app.js"></script>
+  <script src="levantamento.js"></script>
 </body>
 </html>

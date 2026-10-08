@@ -279,3 +279,6 @@
 .nav-group.group-hidden{display:none!important}
 .notification-settings-panel{max-width:1000px}.notification-user-row{max-width:480px;margin:14px 0 18px}.notification-user-row label{display:grid;gap:6px;font-size:13px;font-weight:700}
 .notification-table{min-width:650px}.notification-table th:nth-child(2),.notification-table th:nth-child(3),.notification-table td:nth-child(2),.notification-table td:nth-child(3){width:150px;text-align:center}.notification-table input[type=checkbox]{width:18px;height:18px}
+
+/* V052.7 Levantamento em Obra */
+#page-levantamento .card{margin:14px 0;padding:18px} .lev-bar{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0} .lev-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.lev-stats h2{margin:5px 0}.lev-mat-row{display:grid;grid-template-columns:minmax(0,1fr) 100px 42px;gap:8px;margin:8px 0}.lev-foto{display:inline-flex;align-items:center;gap:6px;margin:8px}.lev-foto img{width:110px;height:90px;object-fit:cover;border-radius:8px}@media(max-width:700px){.lev-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.lev-mat-row{grid-template-columns:minmax(0,1fr) 75px 42px}}

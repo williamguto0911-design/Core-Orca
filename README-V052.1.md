@@ -1,4 +1,4 @@
-# Core Orça V052.6 — Preferências de alertas do Dashboard
+# Core Orça V052.1 — Preferências de alertas do Dashboard
 
 - Alertas de estoque baixo, financeiro vencido, vencimentos próximos e agenda respeitam `usuario_notificacoes_config.no_sistema` do usuário autenticado.
 - Preferências são carregadas após autenticação/atualização e no botão Atualizar alertas.

@@ -256,54 +256,6 @@ async function loadRecibos(){const {data,error}=await sb.from("recibos").select(
 async function loadListasMateriais(){const {data,error}=await sb.from("listas_materiais").select("*,clientes(nome),orcamentos(numero),recibos!listas_materiais_recibo_id_fkey(numero),ordens_servico(numero),lista_materiais_itens(id)").order("created_at",{ascending:false});if(error){listasMateriais=[];console.warn("Listas de materiais:",error.message);return}listasMateriais=data||[]}
 async function loadCargos(){const {data,error}=await sb.from("cargos").select("*").order("nome");if(error){cargos=[];return}cargos=data||[]}
 async function loadSaasAdmin(){const [{data,error},{data:mods,error:me}]=await Promise.all([sb.rpc("admin_list_empresas"),sb.rpc("admin_get_empresa_modulos_v040")]);if(error){empresasSaas=[];return}const mm=Object.fromEntries((mods||[]).map(x=>[x.empresa_id,x.modulos||{}]));empresasSaas=(data||[]).map(x=>({...x,modulos_ativos:mm[x.id]||{}}));if(me)console.warn("Módulos:",me.message)}
-const NOTIFICATION_TYPES=[
- {key:"estoque_baixo",label:"Estoque baixo"},
- {key:"financeiro_vencido",label:"Financeiro vencido"},
- {key:"financeiro_vencimento",label:"Vencimentos financeiros próximos"},
- {key:"agenda_dia",label:"Compromissos da agenda"},
- {key:"licenca_vencimento",label:"Licença próxima do vencimento"},
- {key:"orcamento",label:"Orçamentos"},
- {key:"ordem_servico",label:"Ordens de Serviço"},
- {key:"compras",label:"Compras"}
-];
-let notificationSettings=[];
-async function loadNotificationSettings(userId){
- if(!userId){notificationSettings=[];return}
- const {data,error}=await sb.from("usuario_notificacoes_config").select("*").eq("usuario_empresa_id",userId);
- if(error){console.warn("Notificações:",error.message);notificationSettings=[];return}
- notificationSettings=data||[];
-}
-function renderNotificationSettings(){
- const sel=$("notif-user"),body=$("notif-settings-body");if(!sel||!body)return;
- const activeUsers=(usuarios||[]).filter(u=>u.ativo!==false);
- const current=sel.value||currentUserProfile?.usuario_empresa_id||activeUsers[0]?.id||"";
- sel.innerHTML=activeUsers.map(u=>`<option value="${u.id}" ${u.id===current?"selected":""}>${esc(u.nome||u.email)} — ${esc(u.email||"")}</option>`).join("");
- const map=Object.fromEntries((notificationSettings||[]).map(x=>[x.tipo,x]));
- body.innerHTML=NOTIFICATION_TYPES.map(n=>{const x=map[n.key]||{};return `<tr><td><b>${esc(n.label)}</b></td><td><input type="checkbox" data-notif-app="${n.key}" ${x.no_sistema!==false?"checked":""}></td><td><input type="checkbox" data-notif-email="${n.key}" ${x.por_email?"checked":""}></td></tr>`}).join("");
-}
-async function openNotificationSettings(userId){
- const id=userId||$("notif-user")?.value||currentUserProfile?.usuario_empresa_id||usuarios?.[0]?.id;if(!id)return;
- await loadNotificationSettings(id);renderNotificationSettings();
-}
-async function saveNotificationSettings(){
- const userId=$("notif-user")?.value;if(!userId)return toast("Selecione um usuário");
- const rows=NOTIFICATION_TYPES.map(n=>({usuario_empresa_id:userId,tipo:n.key,no_sistema:!!document.querySelector(`[data-notif-app="${n.key}"]`)?.checked,por_email:!!document.querySelector(`[data-notif-email="${n.key}"]`)?.checked}));
- const {error}=await sb.from("usuario_notificacoes_config").upsert(rows,{onConflict:"usuario_empresa_id,tipo"});if(error)return toast(error.message);
- await loadNotificationSettings(userId);toast("Notificações salvas");
-}
-function refreshNavGroups(){
- document.querySelectorAll(".nav-group").forEach(g=>{
-   const visible=[...g.querySelectorAll(".nav-subitem")].some(x=>!x.classList.contains("hidden"));
-   g.classList.toggle("group-hidden",!visible);
-   const active=[...g.querySelectorAll(".nav-subitem")].some(x=>x.classList.contains("active"));
-   g.classList.toggle("has-active",active);if(active)g.classList.add("open");
- });
-}
-function initHierarchicalNav(){
- document.querySelectorAll(".nav-group-toggle").forEach(btn=>btn.onclick=()=>{const group=btn.closest(".nav-group"),opening=!group.classList.contains("open");document.querySelectorAll(".nav-group").forEach(g=>g.classList.remove("open"));if(opening)group.classList.add("open")});
- refreshNavGroups();
-}
-
 function can(module,action="read"){
  if(currentUserProfile?.is_platform_admin)return false;
  if(currentUserProfile?.tipo==="gerente")return true;
@@ -341,7 +293,6 @@ function applyPermissions(){
    console.warn("Usuário autenticado sem vínculo ativo com empresa:",currentUserProfile);
    setTimeout(()=>toast("Seu login não possui vínculo ativo com uma empresa. Verifique o cadastro do usuário em Gerenciar Usuários."),250);
  }
- refreshNavGroups();
 }
 
 
@@ -368,8 +319,6 @@ function renderDashboard(){
 function navigate(page){
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
-  refreshNavGroups();
-  if(page==="notificacoes")setTimeout(()=>openNotificationSettings(),0);
   $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Vertical",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
@@ -1411,9 +1360,7 @@ $("refresh-alerts").onclick=renderAlerts;$("rel-aplicar").onclick=renderRelatori
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
 $("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("lista-material-search").oninput=renderListasMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
 $("recibo-search").oninput=renderRecibos;$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
-$("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{navigate(b.dataset.page)});initHierarchicalNav();
-if($("notif-user"))$("notif-user").onchange=e=>openNotificationSettings(e.target.value);
-if($("notif-save"))$("notif-save").onclick=saveNotificationSettings;
+$("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{navigate(b.dataset.page)});
 
 
 /* V26 — Lista de Materiais */
@@ -1839,75 +1786,3 @@ setTimeout(()=>{if($('oe-new'))$('oe-new').onclick=novaObraEletrica;if($('oe-ope
 
 // V048 — atalhos globais
 document.addEventListener("keydown",e=>{if(!e.ctrlKey||e.altKey)return;const k=e.key.toLowerCase();const inRich=!!e.target.closest?.(".rich-editor");if(inRich)return;if(k==="l"&&currentPage==="lista-materiais"){e.preventDefault();openListaMaterialForm()}else if(k==="m"&&currentPage==="materiais"){e.preventDefault();materialForm()}});
-
-/* =========================================================
-   V052 — revisão completa do Esquema Vertical
-   - renderização única e consistente
-   - ações contextuais por pavimento/quadro
-   - validação de UUID antes de qualquer request
-   - bloqueio de duplo clique durante gravação
-   - eventos por delegação, sem depender de onclick inline
-   ========================================================= */
-let oeV052Busy=false;
-function oeV052SetBusy(v){oeV052Busy=!!v;document.querySelector('#page-unifilar')?.classList.toggle('oe-v052-loading',!!v)}
-function oeV052Err(error,fallback='Não foi possível concluir a operação.'){console.error('[Esquema Vertical]',error);toast(error?.message||fallback)}
-function oeV052Id(v,label){const id=String(v||'').trim();if(!oeValidUuid(id)){toast(`${label} inválido. Atualize a página e reabra a obra.`);return null}return id}
-async function oeV052Reload(){const id=oeV052Id(obraEletricaAtual?.id,'Obra');if(!id)return;await carregarObraEletrica(id)}
-
-async function renderUnifilar(){
- const empty=$('oe-empty'),work=$('oe-work');if(!empty||!work)return;
- if(!obraEletricaAtual){empty.classList.remove('hidden');work.classList.add('hidden');return}
- empty.classList.add('hidden');work.classList.remove('hidden');
- $('oe-title').textContent=obraEletricaAtual.nome||'-';
- $('oe-client').textContent=clientes.find(c=>c.id===obraEletricaAtual.cliente_id)?.nome||'Sem cliente';
- $('oe-floor-count').textContent=obraEletricaPavimentos.length;
- $('oe-item-count').textContent=obraEletricaComponentes.length;
- const opts=oeOpt();document.querySelectorAll('[data-oe-option]').forEach(x=>x.checked=!!opts[x.dataset.oeOption]);
- renderObraEletricaPavimentos();
-}
-
-function renderObraEletricaPavimentos(){
- const el=$('oe-floors');if(!el)return;
- const floors=[...obraEletricaPavimentos].sort((a,b)=>(a.ordem??0)-(b.ordem??0));
- el.innerHTML=floors.map((p,pi)=>{
-  const ss=obraEletricaEstruturas.filter(s=>s.pavimento_id===p.id).sort((a,b)=>(a.ordem??0)-(b.ordem??0));
-  return `<section class="oe-floor" data-floor-id="${p.id}"><header><div class="oe-floor-title"><span class="oe-floor-badge">${pi+1}</span><div><small>PAVIMENTO</small><h3>${esc(p.nome)}</h3></div></div><div class="oe-card-actions"><span>${ss.length} local(is)</span><button class="action-btn" data-oe-action="add-struct" data-floor="${p.id}">+ Quadro</button><button class="action-btn" data-oe-action="edit-floor" data-id="${p.id}">Editar</button><button class="action-btn danger" data-oe-action="delete-floor" data-id="${p.id}">Excluir</button></div></header><div class="oe-struct-grid">${ss.length?ss.map(s=>{
-   const cc=obraEletricaComponentes.filter(c=>c.estrutura_id===s.id).sort((a,b)=>(a.ordem??0)-(b.ordem??0)),det=s.detalhes||{};
-   return `<article class="oe-struct" data-struct-id="${s.id}"><div class="oe-struct-head"><div><small>${esc(oeTipoLabel(s.tipo).toUpperCase())}</small><b>${esc(s.nome)}</b><em>${esc(s.sistema||'')}${det.carga_instalada!=null?` • Carga ${oeFmtKw(det.carga_instalada)}`:''}${det.demanda!=null?` • Demanda ${oeFmtKw(det.demanda)}`:''}</em></div><div class="oe-inline-actions"><button class="action-btn" data-oe-action="add-component" data-struct="${s.id}">+ Componente</button><button class="action-btn" data-oe-action="edit-struct" data-id="${s.id}">Editar</button><button class="action-btn danger" data-oe-action="delete-struct" data-id="${s.id}">Excluir</button></div></div><div class="oe-components">${cc.map(c=>{const m=materiais.find(x=>x.id===c.material_id);return `<div class="oe-component" data-component-id="${c.id}"><div class="oe-component-main"><b>${esc(c.identificacao||oeTipoLabel(c.tipo))}</b><small>${esc(m?.nome||'Material não encontrado')}${c.observacoes?'<br>'+esc(c.observacoes):''}</small></div><strong>${Number(c.quantidade||0).toLocaleString('pt-BR')} ${esc(m?.unidade||'un')}</strong><div class="oe-inline-actions"><button class="action-btn" data-oe-action="edit-component" data-id="${c.id}">Editar</button><button class="action-btn danger" data-oe-action="delete-component" data-id="${c.id}">Excluir</button></div></div>`}).join('')}<button class="oe-add-inline" data-oe-action="add-component" data-struct="${s.id}">+ Adicionar componente a ${esc(s.nome)}</button></div></article>`}).join(''):`<div class="oe-floor-empty">Nenhum quadro ou equipamento neste pavimento.<br><button class="btn secondary" data-oe-action="add-struct" data-floor="${p.id}">+ Adicionar quadro / equipamento</button></div>`}</div></section>`
- }).join('')||`<div class="oe-empty"><div class="oe-empty-icon">＋</div><b>Nenhum pavimento cadastrado</b><span>Adicione o primeiro pavimento para organizar os quadros e componentes.</span><button class="btn primary" data-oe-action="add-floor">+ Adicionar pavimento</button></div>`;
-}
-
-function adicionarPavimento(p=null){
- p=(p&&oeValidUuid(p.id))?p:null;if(!obraEletricaAtual)return toast('Crie ou abra um esquema vertical.');
- const obraId=oeV052Id(obraEletricaAtual.id,'Obra');if(!obraId)return;
- openModal(p?'Editar pavimento':'Adicionar pavimento',`<form id="oe-floor-form"><p class="oe-modal-help">Defina o nome exibido no esquema e a ordem do pavimento.</p><div class="form-grid"><label>Nome*<input id="oef-name" required value="${esc(p?.nome||'')}" placeholder="Ex.: Térreo, G1, Lazer, Tipo 01"></label><label>Ordem<input id="oef-order" type="number" min="0" value="${p?.ordem??obraEletricaPavimentos.length}"></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary" type="submit">${p?'Salvar alterações':'Adicionar pavimento'}</button></div></form>`);
- $('oe-floor-form').onsubmit=async e=>{e.preventDefault();if(oeV052Busy)return;const nome=$('oef-name').value.trim();if(!nome)return toast('Informe o nome do pavimento.');oeV052SetBusy(true);try{const payload={nome,ordem:Number($('oef-order').value)||0};const r=p?await sb.from('obra_eletrica_pavimentos').update(payload).eq('id',p.id).select().single():await sb.from('obra_eletrica_pavimentos').insert({...payload,obra_id:obraId}).select().single();if(r.error)return oeV052Err(r.error);closeModal();await oeV052Reload();toast(p?'Pavimento atualizado.':'Pavimento adicionado.')}finally{oeV052SetBusy(false)}};
-}
-
-function adicionarEstrutura(tipoInicial='quadro',s0=null,preFloor=null){
- s0=(s0&&oeValidUuid(s0.id))?s0:null;if(!obraEletricaAtual)return toast('Crie ou abra um esquema vertical.');if(!obraEletricaPavimentos.length)return toast('Cadastre primeiro um pavimento.');
- const obraId=oeV052Id(obraEletricaAtual.id,'Obra');if(!obraId)return;const tipos=['apartamento','quadro_medicao','qgbt','subestacao','quadro_condominio','lazer','garagem','gerador','barramento_blindado','quadro','outro'];const det=s0?.detalhes||{};const floorDefault=s0?.pavimento_id||preFloor||obraEletricaPavimentos[0]?.id;
- openModal(s0?'Editar quadro / equipamento':(tipoInicial==='apartamento'?'Adicionar apartamento':'Adicionar quadro / equipamento'),`<form id="oe-struct-form"><p class="oe-modal-help">Cadastre o local elétrico e vincule-o ao pavimento correto.</p><div class="form-grid"><label>Tipo<select id="oes-type">${tipos.map(t=>`<option value="${t}" ${t===(s0?.tipo||tipoInicial)?'selected':''}>${oeTipoLabel(t)}</option>`).join('')}</select></label><label>Identificação*<input id="oes-name" required value="${esc(s0?.nome||'')}" placeholder="Ex.: Apto 101, QD-101, QGBT"></label><label>Pavimento*<select id="oes-floor">${obraEletricaPavimentos.map(p=>`<option value="${p.id}" ${p.id===floorDefault?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label><label>Sistema<select id="oes-system">${['Monofásico','Bifásico','Trifásico'].map(x=>`<option ${x===s0?.sistema?'selected':''}>${x}</option>`).join('')}</select></label><label>Carga instalada (kW)<input id="oes-carga" type="number" min="0" step="0.01" value="${det.carga_instalada??''}"></label><label>Demanda (kW)<input id="oes-demanda" type="number" min="0" step="0.01" value="${det.demanda??''}"></label><label class="span-2">Observações<textarea id="oes-obs" rows="4">${esc(s0?.observacoes||'')}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form>`);
- $('oe-struct-form').onsubmit=async e=>{e.preventDefault();if(oeV052Busy)return;const floorId=oeV052Id($('oes-floor').value,'Pavimento');if(!floorId)return;const nome=$('oes-name').value.trim();if(!nome)return toast('Informe a identificação.');oeV052SetBusy(true);try{const payload={pavimento_id:floorId,tipo:$('oes-type').value,nome,sistema:$('oes-system').value,observacoes:$('oes-obs').value.trim()||null,detalhes:{...det,carga_instalada:$('oes-carga').value===''?null:oeNum($('oes-carga').value),demanda:$('oes-demanda').value===''?null:oeNum($('oes-demanda').value)}};const r=s0?await sb.from('obra_eletrica_estruturas').update(payload).eq('id',s0.id).select().single():await sb.from('obra_eletrica_estruturas').insert({...payload,obra_id:obraId,ordem:obraEletricaEstruturas.length}).select().single();if(r.error)return oeV052Err(r.error);if(s0&&s0.pavimento_id!==floorId){const cr=await sb.from('obra_eletrica_componentes').update({pavimento_id:floorId}).eq('estrutura_id',s0.id);if(cr.error)return oeV052Err(cr.error)}closeModal();await oeV052Reload();toast(s0?'Cadastro atualizado.':'Quadro / equipamento adicionado.')}finally{oeV052SetBusy(false)}};
-}
-
-function adicionarComponente(c0=null,preStruct=null){
- c0=(c0&&oeValidUuid(c0.id))?c0:null;if(!obraEletricaAtual)return toast('Crie ou abra um esquema vertical.');if(!obraEletricaEstruturas.length)return toast('Cadastre primeiro um apartamento, quadro ou equipamento.');
- const obraId=oeV052Id(obraEletricaAtual.id,'Obra');if(!obraId)return;const tipos=['cabo_entrada','cabo_saida','disjuntor','idr','dps','barramento_pente','barramento_neutro','barramento_terra','medidor','transformador','gerador','outro'];const structDefault=c0?.estrutura_id||preStruct||obraEletricaEstruturas[0]?.id;
- openModal(c0?'Editar componente':'Adicionar componente',`<form id="oe-comp-form"><p class="oe-modal-help">Todo componente deve estar vinculado a um material cadastrado no banco.</p><div class="form-grid"><label>Local / quadro*<select id="oec-struct" data-no-search="true">${obraEletricaEstruturas.map(s=>`<option value="${s.id}" ${s.id===structDefault?'selected':''}>${esc(s.nome)}</option>`).join('')}</select></label><label>Tipo<select id="oec-type" data-no-search="true">${tipos.map(t=>`<option value="${t}" ${t===c0?.tipo?'selected':''}>${oeTipoLabel(t)}</option>`).join('')}</select></label><label class="span-2">Material do banco*<select id="oec-material" required>${oeMaterialOptions(c0?.material_id)}</select></label><label>Quantidade<input id="oec-qtd" type="number" min="0.01" step="0.01" value="${c0?.quantidade??1}"></label><label>Identificação<input id="oec-label" value="${esc(c0?.identificacao||'')}" placeholder="Ex.: DJ Geral, IDR-01"></label><label class="span-2">Observações técnicas<textarea id="oec-obs" rows="4" placeholder="Marca, modelo, cor, corrente, seção, comprimento...">${esc(c0?.observacoes||'')}</textarea></label></div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary" type="submit">Salvar</button></div></form>`);
- enhanceSearchableSelect($('oec-material'));
- $('oe-comp-form').onsubmit=async e=>{e.preventDefault();if(oeV052Busy)return;const sid=oeV052Id($('oec-struct')?.value,'Local / quadro');const mid=oeV052Id($('oec-material')?.value,'Material');if(!sid||!mid)return;const st=obraEletricaEstruturas.find(x=>x.id===sid);if(!st)return toast('O local selecionado não está carregado. Reabra a obra.');const pavId=oeV052Id(st.pavimento_id,'Pavimento do quadro');if(!pavId)return;if(!materiais.some(x=>x.id===mid))return toast('O material selecionado não pertence ao catálogo disponível.');oeV052SetBusy(true);try{const payload={pavimento_id:pavId,estrutura_id:sid,tipo:$('oec-type').value,material_id:mid,quantidade:Number($('oec-qtd').value)||1,identificacao:$('oec-label').value.trim()||null,observacoes:$('oec-obs').value.trim()||null};const r=c0?await sb.from('obra_eletrica_componentes').update(payload).eq('id',c0.id).select().single():await sb.from('obra_eletrica_componentes').insert({...payload,obra_id:obraId,ordem:obraEletricaComponentes.length}).select().single();if(r.error)return oeV052Err(r.error);closeModal();await oeV052Reload();toast(c0?'Componente atualizado.':'Componente adicionado.')}finally{oeV052SetBusy(false)}};
-}
-
-function editarPavimento(id){const p=obraEletricaPavimentos.find(x=>x.id===id);if(!p)return toast('Pavimento não encontrado.');adicionarPavimento(p)}
-function editarEstrutura(id){const s=obraEletricaEstruturas.find(x=>x.id===id);if(!s)return toast('Quadro / equipamento não encontrado.');adicionarEstrutura(s.tipo,s)}
-function editarComponente(id){const c=obraEletricaComponentes.find(x=>x.id===id);if(!c)return toast('Componente não encontrado.');adicionarComponente(c)}
-
-function oeV052HandleAction(btn){const a=btn.dataset.oeAction;if(!a)return;const id=btn.dataset.id;switch(a){case'add-floor':return adicionarPavimento();case'edit-floor':return editarPavimento(id);case'delete-floor':return excluirPavimento(id);case'add-struct':return adicionarEstrutura('quadro',null,btn.dataset.floor);case'edit-struct':return editarEstrutura(id);case'delete-struct':return excluirEstrutura(id);case'add-component':return adicionarComponente(null,btn.dataset.struct);case'edit-component':return editarComponente(id);case'delete-component':return excluirComponente(id)}}
-document.addEventListener('click',e=>{const b=e.target.closest?.('[data-oe-action]');if(b){e.preventDefault();oeV052HandleAction(b);return}const m=e.target.closest?.('[data-oe-main]');if(m){e.preventDefault();m.dataset.oeMain==='new'?novaObraEletrica():abrirObraEletrica()}});
-
-// Rebind explícito após todo o app estar carregado.
-setTimeout(()=>{const binds={
- 'oe-new':novaObraEletrica,'oe-open':abrirObraEletrica,'oe-add-floor':()=>adicionarPavimento(),'oe-add-apartment':()=>adicionarEstrutura('apartamento'),'oe-add-board':()=>adicionarEstrutura('quadro'),'oe-add-component':()=>adicionarComponente(),'oe-edit-work':editarObraEletrica,'oe-delete-work':excluirObraEletrica,'oe-save':salvarOpcoesObra,'oe-materials':gerarListaMateriaisObra,'oe-pdf':imprimirEsquemaPavimentos};
- Object.entries(binds).forEach(([id,fn])=>{const el=$(id);if(el)el.onclick=e=>{e.preventDefault();fn()}});renderUnifilar();
-},50);

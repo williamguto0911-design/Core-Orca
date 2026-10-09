@@ -285,3 +285,22 @@
 
 /* V053.1 — seleção de fotografias no levantamento */
 .lev-preview-grid{display:flex;flex-wrap:wrap;gap:9px;margin:10px 0}.lev-prev-img{width:105px;height:95px;object-fit:cover;border:1px solid #dce4ef;border-radius:8px}
+
+/* V054 — usabilidade móvel */
+html{overflow-x:hidden} .app,.main,.page,.panel{min-width:0}
+@media(max-width:850px){
+ .sidebar{width:min(320px,86vw);overflow-y:auto;overscroll-behavior:contain;padding-bottom:env(safe-area-inset-bottom)}
+ .sidebar nav{overflow-y:visible;display:block}.sidebar nav>.nav-item,.sidebar .nav-group{margin-bottom:5px}
+ .topbar{min-height:60px;height:auto;padding:10px 12px;gap:8px}.topbar h2{font-size:clamp(16px,4vw,20px);min-width:0;overflow-wrap:anywhere}
+ .page{padding:12px}.panel{padding:12px}.toolbar,.modal-actions,.action-group{flex-wrap:wrap}
+ .toolbar>.btn,.modal-actions>.btn{min-height:42px}.table-wrap{max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+ input,select,textarea{font-size:16px;max-width:100%}.btn,.action-btn,.nav-item,.nav-group-toggle{min-height:42px;touch-action:manipulation}
+ .modal{padding:6px;align-items:center}.modal-card{width:calc(100vw - 12px);max-width:100%;max-height:calc(100dvh - 12px);overflow:auto;padding:14px}
+ .modal-card .form-grid,.modal-card .permission-grid{grid-template-columns:minmax(0,1fr)}
+ .lm-topic-toolbar{grid-template-columns:minmax(0,1fr)!important}.lm-inline-editor{grid-template-columns:minmax(0,1fr)}
+ .oe-v052 .oe-struct-grid{grid-template-columns:minmax(0,1fr)}
+ .uf-dark .unifilar-workspace{display:block;overflow:auto}.uf-dark .unifilar-palette,.uf-dark .unifilar-properties{max-height:300px}
+ .uf-dark .unifilar-canvas{min-width:650px}.uf-dark .unifilar-meta{grid-template-columns:1fr 1fr}
+ .v054-license-row{display:grid;grid-template-columns:1fr;gap:8px}.license-list{max-width:100%;overflow-x:auto}
+}
+@media(max-width:520px){.stats,.mini-stats,.lev-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats article{padding:12px}.stats strong{font-size:20px}.modal-actions .btn{flex:1}.login-card{padding:20px}.oe-v052 .oe-summary{grid-template-columns:1fr 1fr}}

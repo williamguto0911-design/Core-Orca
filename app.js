@@ -91,6 +91,7 @@ async function showApp(session){
  }
  $("app").classList.remove("hidden");
  if(currentUserProfile?.deve_trocar_senha){forcePasswordChange();return}
+ v054PresencePulse();
  await refreshAll();
  await showLicenseExpiryNotice();
 }
@@ -174,7 +175,7 @@ function renderCurrent(){
   if(currentPage==="relatorios")renderRelatorios();
   if(currentPage==="recibos")renderRecibos();
   if(currentPage==="cargos")renderCargos();
-  if(currentPage==="admin-plataforma")renderSaasAdmin();
+  if(currentPage==="admin-plataforma"){renderSaasAdmin();refreshV054AdminStats()}
   if(currentPage==="unifilar")renderUnifilar();
   if(currentPage==="levantamento")levInit();
 }
@@ -741,8 +742,24 @@ async function openProof(path){const {data,error}=await sb.storage.from("comprov
 async function viewRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);openModal("Recibo "+r.numero,`<p><b>Cliente:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Total:</b> ${money(r.total)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor</th></tr></thead><tbody>${(itens||[]).map(i=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("")}</tbody></table></div><h4>Pagamentos</h4><div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Pagamento</th><th>Valor</th><th>Método</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${p.vencimento?new Date(p.vencimento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${p.data_pagamento?new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${money(p.valor)}</td><td>${esc(p.metodo_pagamento||"-")}</td><td>${p.status==="pago"?"Pago":"Pendente"}</td><td><button class="action-btn" onclick="paymentPopup('${p.id}','${id}',${p.status!=="pago"})">${p.status==="pago"?"Marcar pendente":"Marcar pago"}</button>${p.comprovante_path?` <button class="action-btn" onclick="openProof('${p.comprovante_path}')">Comprovante</button>`:""}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn secondary" onclick="gerenciarPagamentosRecibo('${id}')">Pagamentos / Parcelamento</button><button class="btn primary" onclick="printRecibo('${id}')">PDF / Imprimir</button></div>`)}
 async function printRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const pay=`<h3>Pagamentos</h3><table><thead><tr><th>Parcela</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`${clientePDFHTML(clienteDoDocumento(r),"Dados cadastrais do pagador / cliente")}<p><b>Emissão:</b> ${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
 
-const permissionModules=["clientes","materiais","lista_materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes","unifilar"];
-const commercialModules=permissionModules;
+const permissionModules=["clientes","materiais","lista_materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes","unifilar","levantamento","usuarios","cargos","notificacoes","admin_plataforma"];
+// Inclui todos os menus funcionais; a administração da plataforma permanece restrita.
+const commercialModules=permissionModules.filter(x=>x!=="admin_plataforma");
+let v054AdminStats={};
+async function refreshV054AdminStats(){
+ if(!currentUserProfile?.is_platform_admin)return;
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"platform-license-overview-v054"}});
+ if(error||data?.error){console.warn("Indicadores de licenças:",error||data?.error);return}
+ v054AdminStats=data?.companies||{};
+ renderSaasAdmin();
+}
+async function v054PresencePulse(){
+ if(!currentSession?.user||document.visibilityState!=="visible")return;
+ try{await sb.functions.invoke("core-orca-admin-users",{body:{action:"presence-heartbeat-v054"}})}catch(e){console.warn("Presença:",e)}
+}
+setInterval(()=>{v054PresencePulse();if(currentUserProfile?.is_platform_admin&&currentPage==="admin-plataforma")refreshV054AdminStats()},45000);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")v054PresencePulse()});
+
 function renderCargos(){const q=$("cargo-search").value,rows=cargos.filter(c=>smartSearch(c,q));$("cargos-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b></td><td>${esc(c.descricao||"-")}</td><td>${Object.keys(c.permissoes||{}).filter(k=>c.permissoes[k]?.read||c.permissoes[k]===true).map(statusLabel).join(", ")||"Sem acesso"}</td><td><button class="action-btn" onclick="cargoForm(cargos.find(x=>x.id==='${c.id}'))">Editar</button></td></tr>`).join("")||'<tr><td colspan="4">Nenhum cargo personalizado.</td></tr>'}
 function cargoForm(c={}){
  const p=c.permissoes||{};openModal(c.id?"Editar cargo":"Novo cargo",`<form id="entity-form"><div class="form-grid"><label>Nome*<input id="f-nome" required value="${esc(c.nome)}"></label><label>Descrição<input id="f-desc" value="${esc(c.descricao)}"></label></div><div class="permission-grid">${permissionModules.map(m=>`<div class="permission-card"><b>${statusLabel(m)}</b><label><input type="checkbox" data-pm="${m}" data-pa="read" ${p[m]?.read||p[m]===true?"checked":""}> Visualizar</label><label><input type="checkbox" data-pm="${m}" data-pa="write" ${p[m]?.write?"checked":""}> Criar/editar</label><label><input type="checkbox" data-pm="${m}" data-pa="delete" ${p[m]?.delete?"checked":""}> Excluir</label></div>`).join("")}</div><div class="modal-actions"><button type="button" class="btn secondary" onclick="closeModal()">Cancelar</button><button class="btn primary">Salvar</button></div></form>`);
@@ -752,7 +769,7 @@ function cargoForm(c={}){
 function renderSaasAdmin(){
  if(!currentUserProfile?.is_platform_admin)return;
  const total=empresasSaas.reduce((s,e)=>s+Number(e.licencas_max||0),0);
- const used=empresasSaas.reduce((s,e)=>s+Number(e.licencas_usadas||0),0);
+ const used=empresasSaas.reduce((s,e)=>s+Number(v054AdminStats[e.id]?.em_uso??e.licencas_usadas??0),0);
  $("saas-empresas").textContent=empresasSaas.length;
  $("saas-licencas").textContent=total;
  $("saas-usuarios").textContent=used;
@@ -762,7 +779,7 @@ function renderSaasAdmin(){
    <td>${esc(e.documento||"-")}</td>
    <td>${esc(e.responsavel_nome||"-")}<br><small>${esc(e.responsavel_email||"")}</small></td>
    <td class="${e.ativa?"license-ok":"license-blocked"}">${e.ativa?"Ativa":"Bloqueada"}</td>
-   <td>${e.licencas_max}</td><td>${e.licencas_usadas}</td>
+   <td>${Number(e.licencas_max||0)}</td><td>${v054AdminStats[e.id]?.em_uso??"—"}</td><td>${v054AdminStats[e.id]?.logadas??"—"}</td>
    <td>${e.licenca_validade?new Date(e.licenca_validade+"T12:00:00").toLocaleDateString("pt-BR"):"Sem limite"}</td>
    <td><div class="action-group">
      <button class="action-btn" onclick="manageLicenses('${e.id}')">Licenças</button>
@@ -771,7 +788,7 @@ function renderSaasAdmin(){
      <button class="action-btn" onclick="adminResetManager('${e.id}')">Senha gerente</button>
      ${e.nome==="Administração Core Orça"?"":`<button class="action-btn danger" onclick="deleteCompany('${e.id}')">Excluir</button>`}
    </div></td>
- </tr>`).join("")||'<tr><td colspan="8">Nenhuma empresa cadastrada.</td></tr>';
+ </tr>`).join("")||'<tr><td colspan="9">Nenhuma empresa cadastrada.</td></tr>';
 }
 function empresaSaasForm(e={}){
  const creating=!e.id;
@@ -866,17 +883,25 @@ function forcePasswordChange(){
 }
 
 async function manageLicenses(empresaId){
- const empresa=empresasSaas.find(e=>e.id===empresaId);
- const {data,error}=await sb.rpc("admin_list_licencas_v040",{p_empresa_id:empresaId});
- if(error)return toast(error.message);
- const rows=data||[];
- openModal("Licenças — "+empresa.nome,`<div class="panel-head"><div><p class="muted">As licenças são vinculadas automaticamente aos e-mails dos usuários ativos. O gerente também consome uma licença. Altere a quantidade em Editar empresa.</p></div></div>
- <div class="license-list">${rows.map(l=>`<div class="license-row">
-   <b>Licença ${l.numero}</b>
-   <span class="${l.status==="ativa"?"license-active":"license-blocked"}">${statusLabel(l.status)}</span>
-   <span>${esc(l.usuario_email||"Não atribuída")}</span>
-
- </div>`).join("")||"<p>Nenhuma licença cadastrada.</p>"}</div>`);
+ const empresa=empresasSaas.find(e=>e.id===empresaId);if(!empresa)return;
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"platform-license-users-v054",empresa_id:empresaId}});
+ if(error||data?.error)return toast("Erro ao consultar licenças: "+await edgeFunctionError(error,data));
+ const users=data.users||[],total=Number(empresa.licencas_max||0);
+ const slots=Array.from({length:Math.max(total,users.length)},(_,i)=>users[i]||null);
+ openModal("Licenças — "+empresa.nome,`<p class="muted">Contratadas: ${total} · Com e-mail: ${users.filter(x=>x.email).length} · Logadas agora: ${users.filter(x=>x.logada).length}. A presença considera atividade nos últimos 120 segundos.</p><div class="license-list">${slots.map((u,i)=>`<div class="license-row v054-license-row"><b>Licença ${i+1}</b><span class="${u?.logada?"license-active":""}">${u?.logada?"● Logada":u?.email?"Não logada":"Disponível"}</span><span>${esc(u?.nome||"")}<br><small>${esc(u?.email||"Sem e-mail cadastrado")}</small>${u?.bloqueado?'<br><b class="license-blocked">Usuário bloqueado</b>':''}</span><div class="action-group">${u?`<button class="action-btn" onclick="v054ResetLicenseUser('${u.id}','${empresaId}')">Gerar senha temporária</button><button class="action-btn ${u.bloqueado?'':'danger'}" onclick="v054BlockLicenseUser('${u.id}','${empresaId}',${u.bloqueado})">${u.bloqueado?'Desbloquear usuário':'Bloquear usuário'}</button>`:''}</div></div>`).join("")||'<p>Nenhuma licença cadastrada.</p>'}</div>`);
+}
+async function v054ResetLicenseUser(id,empresaId){
+ if(!confirm("Gerar uma nova senha temporária para esta licença?"))return;
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"platform-reset-license-user-v054",empresa_id:empresaId,usuario_id:id}});
+ if(error||data?.error)return toast("Erro: "+await edgeFunctionError(error,data));
+ showTemporaryPassword(data.email,data.temporary_password,"Senha temporária gerada");
+}
+async function v054BlockLicenseUser(id,empresaId,blocked){
+ if(!confirm(blocked?"Desbloquear este usuário?":"Bloquear este usuário? O acesso ao login será impedido."))return;
+ const {data,error}=await sb.functions.invoke("core-orca-admin-users",{body:{action:"platform-set-user-block-v054",empresa_id:empresaId,usuario_id:id,bloquear:!blocked}});
+ if(error||data?.error)return toast("Erro: "+await edgeFunctionError(error,data));
+ await refreshV054AdminStats();await manageLicenses(empresaId);
+ toast(blocked?"Usuário desbloqueado":"Usuário bloqueado");
 }
 
 async function licenseAction(id,action,empresaId){

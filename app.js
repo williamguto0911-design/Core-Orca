@@ -627,6 +627,27 @@ function reciboVinculoCliente(tipo,id){
  const src=tipo==="orcamento"?orcamentos:tipo==="lista_materiais"?listasMateriais:tipo==="ordem_servico"?ordens:[];
  return src.find(x=>String(x.id)===String(id))?.cliente_id||null;
 }
+function reciboValorLiquidoVinculo(tipo,id){
+ const src=tipo==="orcamento"?orcamentos:tipo==="ordem_servico"?ordens:[];
+ const doc=src.find(x=>String(x.id)===String(id));
+ if(!doc)return null;
+ const subtotal=Number(doc.subtotal)||0,desconto=Number(doc.desconto)||0;
+ return {subtotal,desconto,total:Number.isFinite(Number(doc.total))?Number(doc.total):Math.max(0,subtotal-desconto)};
+}
+function aplicarDescontoProporcionalNosItens(itens,totalLiquido){
+ const rows=(itens||[]).map(i=>({...i}));
+ const bruto=rows.reduce((s,i)=>s+(Number(i.quantidade)||0)*(Number(i.valor_unitario)||0),0);
+ if(!rows.length||!Number.isFinite(Number(totalLiquido))||bruto<=0||totalLiquido>=bruto-0.005)return rows;
+ let restante=Math.round(Number(totalLiquido)*100);
+ rows.forEach((i,n)=>{
+   const qtd=Number(i.quantidade)||1;
+   const brutoLinha=Math.round(qtd*(Number(i.valor_unitario)||0)*100);
+   const liquidoLinha=n===rows.length-1?restante:Math.round(brutoLinha*Number(totalLiquido)/bruto);
+   restante-=liquidoLinha;
+   i.valor_unitario=Number((liquidoLinha/100/qtd).toFixed(6));
+ });
+ return rows;
+}
 async function carregarItensVinculoRecibo(tipo,id){
  if(!tipo||tipo==="sem_vinculo"||!id){editorItens=[];renderEditorItens();return 0}
  let table,fk;
@@ -640,6 +661,8 @@ async function carregarItensVinculoRecibo(tipo,id){
    if(tipo==="lista_materiais") return {tipo:"material",referencia_id:i.material_id||null,descricao:i.descricao||"Material",quantidade:Number(i.quantidade)||1,valor_unitario:Number(i.valor_unitario)||0};
    return {tipo:i.tipo|| (i.material_id?"material":"servico"),referencia_id:i.material_id||i.servico_id||null,descricao:i.descricao||"Item",quantidade:Number(i.quantidade)||1,valor_unitario:Number(i.valor_unitario)||0};
  });
+ const financeiroVinculo=reciboValorLiquidoVinculo(tipo,id);
+ if(financeiroVinculo)editorItens=aplicarDescontoProporcionalNosItens(editorItens,financeiroVinculo.total);
  renderEditorItens();
  return editorItens.length;
 }
@@ -740,7 +763,7 @@ async function paymentPopup(paymentId,reciboId,paid){
 async function openProof(path){const {data,error}=await sb.storage.from("comprovantes").createSignedUrl(path,300);if(error)return toast(error.message);window.open(data.signedUrl,"_blank")}
 
 async function viewRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);openModal("Recibo "+r.numero,`<p><b>Cliente:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Total:</b> ${money(r.total)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor</th></tr></thead><tbody>${(itens||[]).map(i=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("")}</tbody></table></div><h4>Pagamentos</h4><div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Pagamento</th><th>Valor</th><th>Método</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${p.vencimento?new Date(p.vencimento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${p.data_pagamento?new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${money(p.valor)}</td><td>${esc(p.metodo_pagamento||"-")}</td><td>${p.status==="pago"?"Pago":"Pendente"}</td><td><button class="action-btn" onclick="paymentPopup('${p.id}','${id}',${p.status!=="pago"})">${p.status==="pago"?"Marcar pendente":"Marcar pago"}</button>${p.comprovante_path?` <button class="action-btn" onclick="openProof('${p.comprovante_path}')">Comprovante</button>`:""}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn secondary" onclick="gerenciarPagamentosRecibo('${id}')">Pagamentos / Parcelamento</button><button class="btn primary" onclick="printRecibo('${id}')">PDF / Imprimir</button></div>`)}
-async function printRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const pay=`<h3>Pagamentos</h3><table><thead><tr><th>Parcela</th><th>Data</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR")}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`${clientePDFHTML(clienteDoDocumento(r),"Dados cadastrais do pagador / cliente")}<p><b>Emissão:</b> ${new Date(r.data_emissao+"T12:00:00").toLocaleDateString("pt-BR")}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
+async function printRecibo(id){const r=recibos.find(x=>x.id===id);if(!r)return;const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const fmt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR"):"—";const pay=`<h3>Previsão de pagamentos e pagamentos realizados</h3><table><thead><tr><th>Parcela</th><th>Previsão de pagamento</th><th>Data em que foi pago</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela||"—"}</td><td>${fmt(p.vencimento)}</td><td>${fmt(p.data_pagamento)}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")||'<tr><td colspan="5">Nenhuma previsão ou pagamento cadastrado.</td></tr>'}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`${clientePDFHTML(clienteDoDocumento(r),"Dados cadastrais do pagador / cliente")}<p><b>Emissão:</b> ${fmt(r.data_emissao)}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
 
 const permissionModules=["clientes","materiais","lista_materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes","unifilar","levantamento","usuarios","cargos","notificacoes","admin_plataforma"];
 // Inclui todos os menus funcionais; a administração da plataforma permanece restrita.
@@ -1394,7 +1417,27 @@ async function viewOrcamento(id){
 }
 async function convertOrcamento(id){
  if(!confirm("Gerar uma Ordem de Serviço a partir deste orçamento?"))return;
- const {data,error}=await sb.rpc("converter_orcamento_em_os",{p_orcamento_id:id});if(error)return toast("Erro: "+error.message);await Promise.all([loadOrcamentos(),loadOrdens()]);renderOrcamentos();renderDashboard();toast("OS criada: "+data);
+ const orc=orcamentos.find(x=>x.id===id);if(!orc)return toast("Orçamento não encontrado.");
+ const {data,error}=await sb.rpc("converter_orcamento_em_os",{p_orcamento_id:id});if(error)return toast("Erro: "+error.message);
+ // O procedimento legado pode copiar o subtotal bruto. Reaplicamos os valores financeiros
+ // do orçamento aprovado na OS recém-criada, incluindo o desconto concedido.
+ const numeroOS=String(data||"").trim();
+ let q=sb.from("ordens_servico").select("*").eq("cliente_id",orc.cliente_id).order("created_at",{ascending:false}).limit(1);
+ if(numeroOS)q=q.eq("numero",numeroOS);
+ let {data:osRows,error:osErr}=await q;
+ if(osErr)return toast("OS criada, mas não foi possível conferir o desconto: "+osErr.message);
+ // Algumas versões da função retornam o identificador em vez do número da OS.
+ if(!osRows?.length){const fallback=await sb.from("ordens_servico").select("*").eq("cliente_id",orc.cliente_id).order("created_at",{ascending:false}).limit(1);if(fallback.error)return toast("OS criada, mas não foi possível localizar o documento para aplicar o desconto.");osRows=fallback.data||[]}
+ const os=osRows?.[0];
+ if(os){
+   const up=await sb.from("ordens_servico").update({subtotal:Number(orc.subtotal)||0,desconto:Number(orc.desconto)||0,total:Number(orc.total)||0}).eq("id",os.id);
+   if(up.error)return toast("OS criada, mas o desconto não pôde ser aplicado: "+up.error.message);
+   const {data:itens,error:itErr}=await sb.from("ordem_servico_itens").select("*").eq("ordem_servico_id",os.id).order("ordem");
+   if(itErr)return toast("Desconto aplicado no total da OS, mas não foi possível ajustar os itens: "+itErr.message);
+   const ajustados=aplicarDescontoProporcionalNosItens((itens||[]).map(i=>({...i,quantidade:Number(i.quantidade)||1,valor_unitario:Number(i.valor_unitario)||0})),Number(orc.total)||0);
+   for(const item of ajustados){const r=await sb.from("ordem_servico_itens").update({valor_unitario:item.valor_unitario}).eq("id",item.id);if(r.error)return toast("Desconto aplicado no total, mas houve erro ao ajustar um item: "+r.error.message)}
+ }
+ await Promise.all([loadOrcamentos(),loadOrdens()]);renderOrcamentos();renderOS();renderDashboard();toast("OS criada com o valor líquido do orçamento (desconto aplicado): "+data);
 }
 
 function osForm(){

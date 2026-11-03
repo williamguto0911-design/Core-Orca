@@ -304,3 +304,8 @@ html{overflow-x:hidden} .app,.main,.page,.panel{min-width:0}
  .v054-license-row{display:grid;grid-template-columns:1fr;gap:8px}.license-list{max-width:100%;overflow-x:auto}
 }
 @media(max-width:520px){.stats,.mini-stats,.lev-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stats article{padding:12px}.stats strong{font-size:20px}.modal-actions .btn{flex:1}.login-card{padding:20px}.oe-v052 .oe-summary{grid-template-columns:1fr 1fr}}
+/* V056 — central de cobranças */
+#page-cobrancas .finance-stats{margin:14px 0 18px}
+#page-cobrancas .muted{display:block;margin-top:12px;line-height:1.5}
+#cb-sugestoes{padding:14px;margin-top:12px}
+#cb-sugestoes label{display:flex;align-items:center;gap:8px;font-size:13px}

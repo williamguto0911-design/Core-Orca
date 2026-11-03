@@ -57,6 +57,7 @@
           <div class="nav-submenu">
             <button class="nav-item nav-subitem" data-page="recibos" data-module="recibos">Recibos</button>
             <button class="nav-item nav-subitem" data-page="financeiro" data-module="financeiro">Financeiro</button>
+            <button class="nav-item nav-subitem" data-page="cobrancas" data-module="financeiro">Cobranças</button>
             <button class="nav-item nav-subitem" data-page="relatorios" data-module="relatorios">Relatórios</button>
           </div>
         </div>
@@ -194,6 +195,12 @@
         </div>
         <div class="toolbar"><input id="financeiro-search" placeholder="Pesquisar lançamento, cliente ou status..."><button id="novo-lancamento" class="btn primary">+ Lançamento</button></div>
         <div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Cliente</th><th>Vencimento</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th></tr></thead><tbody id="financeiro-table"></tbody></table></div>
+      </section>
+      <section id="page-cobrancas" class="page hidden">
+        <div class="toolbar"><input id="cobranca-search" placeholder="Pesquisar cobrança, cliente ou recibo..."><button id="nova-cobranca" class="btn primary">+ Nova cobrança</button></div>
+        <div class="stats finance-stats"><article><span>Programadas</span><strong id="cob-programadas">0</strong></article><article><span>Prontas para envio</span><strong id="cob-prontas">0</strong></article><article><span>Enviadas</span><strong id="cob-enviadas">0</strong></article></div>
+        <div class="table-wrap"><table><thead><tr><th>Data sugerida</th><th>Cliente</th><th>Recibo / Parcela</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="cobrancas-table"></tbody></table></div>
+        <p class="muted">O envio abre a conversa no WhatsApp convencional com a mensagem preenchida. Você confirma o envio no próprio aplicativo. Anexos devem ser selecionados manualmente na conversa.</p>
       </section>
       <section id="page-recibos" class="page hidden">
         <div class="toolbar"><input id="recibo-search" placeholder="Pesquisar recibo ou cliente..."><button id="novo-recibo" class="btn primary">+ Recibo</button></div>

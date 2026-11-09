@@ -127,6 +127,7 @@
       <section id="page-materiais" class="page hidden">
         <div class="toolbar">
           <input id="material-search" placeholder="Pesquisar por código, nome, categoria ou fabricante...">
+          <select id="material-categoria-filter" aria-label="Filtrar materiais por categoria"><option value="">Todas as categorias</option></select>
           <button type="button" id="abrir-catalogo-empresa" class="btn secondary">Catálogo Core-Orça</button>
 <button id="importar-csv" class="btn secondary">Importar CSV</button>
           <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
@@ -149,7 +150,7 @@
       </section>
 
       <section id="page-estoque" class="page hidden">
-        <div class="toolbar"><input id="estoque-search" placeholder="Pesquisar estoque..."><button id="nova-movimentacao" class="btn primary">Movimentar estoque</button></div>
+        <div class="toolbar"><input id="estoque-search" placeholder="Pesquisar estoque..."><select id="estoque-categoria-filter" aria-label="Filtrar estoque por categoria"><option value="">Todas as categorias</option></select><select id="estoque-situacao-filter" aria-label="Filtrar por situação do estoque"><option value="">Todos os estoques</option><option value="baixo">Estoque baixo</option><option value="normal">Estoque normal</option></select><button id="nova-movimentacao" class="btn primary">Movimentar estoque</button></div>
         <div class="table-wrap"><table><thead><tr><th>Material</th><th>Atual</th><th>Mínimo</th><th>Status</th><th>Atualizado</th></tr></thead><tbody id="estoque-table"></tbody></table></div>
       </section>
 

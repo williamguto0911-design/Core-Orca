@@ -448,8 +448,15 @@ function renderClientes(){
  const q=$("cliente-search").value;const rows=clientes.filter(c=>smartSearch(c,q));
  $("clientes-table").innerHTML=rows.map(c=>`<tr><td><b>${esc(c.nome)}</b><br><span class="muted">${esc(c.email||"")}</span></td><td>${esc(c.tipo_pessoa)}</td><td>${esc(c.documento||"-")}</td><td>${esc(c.celular||c.telefone||"-")}</td><td>${esc([c.cidade,c.estado].filter(Boolean).join("/ ")||"-")}</td><td><div class="actions"><button class="action-btn" onclick="editCliente('${c.id}')">Editar</button><button class="action-btn" onclick="deleteCliente('${c.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="6">Nenhum cliente encontrado.</td></tr>`;
 }
+function atualizarFiltroCategorias(id){
+ const sel=$(id);if(!sel)return;
+ const atual=sel.value;
+ const categorias=[...new Set(materiais.map(m=>String(m.categoria||"").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR",{sensitivity:"base"}));
+ sel.innerHTML='<option value="">Todas as categorias</option>'+categorias.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("");
+ if(categorias.includes(atual))sel.value=atual;
+}
 function renderMateriais(){
- const q=$("material-search").value;const rows=materiais.filter(m=>smartSearch(m,q));
+ atualizarFiltroCategorias("material-categoria-filter");const q=$("material-search").value;const categoria=$("material-categoria-filter")?.value||"";const rows=materiais.filter(m=>smartSearch(m,q)&&(!categoria||String(m.categoria||"").trim()===categoria));
  $("materiais-table").innerHTML=rows.map(m=>`<tr><td>${esc(m.codigo||"-")}</td><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.fabricante||"")}</span></td><td>${esc(m.categoria||"-")}</td><td>${esc(m.unidade)}</td><td class="${Number(m.estoque_atual)<=Number(m.estoque_minimo)?"low":"ok"}">${Number(m.estoque_atual).toLocaleString("pt-BR")}</td><td>${money(m.custo)}</td><td>${money(m.preco_venda)}</td><td>${money(m.lucro_valor??(Number(m.preco_venda)-Number(m.custo)))}</td><td>${Number(m.lucro_percentual??(Number(m.custo)>0?((Number(m.preco_venda)-Number(m.custo))/Number(m.custo)*100):0)).toLocaleString("pt-BR",{maximumFractionDigits:2})}%</td><td><div class="actions"><button class="action-btn" onclick="editMaterial('${m.id}')">Editar</button><button class="action-btn" onclick="materialPhotos('${m.id}')">Fotos</button><button class="action-btn" onclick="deleteMaterial('${m.id}')">Excluir</button></div></td></tr>`).join("")||`<tr><td colspan="10">Nenhum material encontrado.</td></tr>`;
 }
 function renderServicos(){
@@ -465,7 +472,7 @@ function renderListasMateriais(){
 }
 
 function renderEstoque(){
- const q=$("estoque-search").value;const rows=materiais.filter(m=>smartSearch(m,q));
+ atualizarFiltroCategorias("estoque-categoria-filter");const q=$("estoque-search").value;const categoria=$("estoque-categoria-filter")?.value||"";const situacao=$("estoque-situacao-filter")?.value||"";const rows=materiais.filter(m=>{const baixo=Number(m.estoque_atual)<=Number(m.estoque_minimo);return smartSearch(m,q)&&(!categoria||String(m.categoria||"").trim()===categoria)&&(!situacao||(situacao==="baixo"?baixo:!baixo));});
  $("estoque-table").innerHTML=rows.map(m=>{const low=Number(m.estoque_atual)<=Number(m.estoque_minimo);return `<tr><td><b>${esc(m.nome)}</b><br><span class="muted">${esc(m.codigo||"")}</span></td><td>${Number(m.estoque_atual).toLocaleString("pt-BR")} ${esc(m.unidade)}</td><td>${Number(m.estoque_minimo).toLocaleString("pt-BR")}</td><td class="${low?"low":"ok"}">${low?"ESTOQUE BAIXO":"OK"}</td><td>${new Date(m.updated_at).toLocaleString("pt-BR")}</td></tr>`}).join("")||`<tr><td colspan="5">Nenhum material encontrado.</td></tr>`;
 }
 function materiaisEstoqueBaixo(){
@@ -1522,7 +1529,7 @@ if($("reposicao-estoque-table"))$("reposicao-estoque-table").addEventListener("i
 $("novo-orcamento").onclick=orcamentoForm;$("nova-os").onclick=osForm;$("novo-recibo").onclick=reciboForm;$("novo-cargo").onclick=()=>cargoForm();$("nova-empresa-saas").onclick=()=>empresaSaasForm();
 $("refresh-alerts").onclick=async()=>{await loadDashboardNotificationSettings();renderAlerts()};$("rel-aplicar").onclick=renderRelatorios;$("rel-export-fin").onclick=exportFinanceiro;$("rel-export-os").onclick=exportOS;$("rel-export-mat").onclick=exportMateriais;$("novo-agendamento").onclick=agendaForm;$("novo-lancamento").onclick=financeiroForm;$("novo-tecnico").onclick=()=>tecnicoForm();$("novo-fornecedor").onclick=()=>fornecedorForm();$("nova-compra").onclick=compraForm;$("novo-usuario").onclick=()=>usuarioForm();
 $("importar-csv").onclick=()=>$("csv-file").click();$("csv-file").onchange=e=>{if(e.target.files[0])importCSV(e.target.files[0]);e.target.value=""};
-$("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("lista-material-search").oninput=renderListasMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
+$("cliente-search").oninput=renderClientes;$("material-search").oninput=renderMateriais;$("material-categoria-filter").onchange=renderMateriais;$("estoque-categoria-filter").onchange=renderEstoque;$("estoque-situacao-filter").onchange=renderEstoque;$("lista-material-search").oninput=renderListasMateriais;$("servico-search").oninput=renderServicos;$("estoque-search").oninput=renderEstoque;$("orcamento-search").oninput=renderOrcamentos;$("os-search").oninput=renderOS;
 $("recibo-search").oninput=renderRecibos;if($("cobranca-search"))$("cobranca-search").oninput=renderCobrancas;if($("nova-cobranca"))$("nova-cobranca").onclick=()=>novaCobranca();$("cargo-search").oninput=renderCargos;$("agenda-search").oninput=renderAgenda;$("financeiro-search").oninput=renderFinanceiro;$("tecnico-search").oninput=renderTecnicos;$("fornecedor-search").oninput=renderFornecedores;$("compra-search").oninput=renderCompras;$("usuario-search").oninput=renderUsuarios;$("os-status-filter").onchange=renderOS;$("empresa-form").onsubmit=saveEmpresa;
 $("menu-btn").onclick=()=>$("sidebar").classList.toggle("open");document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{navigate(b.dataset.page)});initHierarchicalNav();
 if($("notif-user"))$("notif-user").onchange=e=>openNotificationSettings(e.target.value);

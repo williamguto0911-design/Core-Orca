@@ -125,13 +125,15 @@
       </section>
 
       <section id="page-materiais" class="page hidden">
-        <div class="toolbar">
+        <div class="toolbar filtros-empilhados">
           <input id="material-search" placeholder="Pesquisar por código, nome, categoria ou fabricante...">
           <select id="material-categoria-filter" aria-label="Filtrar materiais por categoria"><option value="">Todas as categorias</option></select>
+          <div class="toolbar-actions">
           <button type="button" id="abrir-catalogo-empresa" class="btn secondary">Catálogo Core-Orça</button>
 <button id="importar-csv" class="btn secondary">Importar CSV</button>
           <input id="csv-file" type="file" accept=".csv,text/csv" hidden>
           <button id="novo-material" class="btn primary">+ Material</button>
+          </div>
         </div>
         <div class="table-wrap"><table><thead><tr><th>Código</th><th>Material</th><th>Categoria</th><th>UN</th><th>Estoque</th><th>Custo</th><th>Venda</th><th>Lucro</th><th>Margem</th><th></th></tr></thead><tbody id="materiais-table"></tbody></table></div>
       </section>
@@ -150,7 +152,12 @@
       </section>
 
       <section id="page-estoque" class="page hidden">
-        <div class="toolbar"><input id="estoque-search" placeholder="Pesquisar estoque..."><select id="estoque-categoria-filter" aria-label="Filtrar estoque por categoria"><option value="">Todas as categorias</option></select><select id="estoque-situacao-filter" aria-label="Filtrar por situação do estoque"><option value="">Todos os estoques</option><option value="baixo">Estoque baixo</option><option value="normal">Estoque normal</option></select><button id="nova-movimentacao" class="btn primary">Movimentar estoque</button></div>
+        <div class="toolbar filtros-empilhados">
+          <input id="estoque-search" placeholder="Pesquisar estoque...">
+          <select id="estoque-categoria-filter" aria-label="Filtrar estoque por categoria"><option value="">Todas as categorias</option></select>
+          <select id="estoque-situacao-filter" aria-label="Filtrar por situação do estoque"><option value="">Todos os estoques</option><option value="baixo">Estoque baixo</option><option value="normal">Estoque normal</option></select>
+          <div class="toolbar-actions"><button id="nova-movimentacao" class="btn primary">Movimentar estoque</button></div>
+        </div>
         <div class="table-wrap"><table><thead><tr><th>Material</th><th>Atual</th><th>Mínimo</th><th>Status</th><th>Atualizado</th></tr></thead><tbody id="estoque-table"></tbody></table></div>
       </section>
 

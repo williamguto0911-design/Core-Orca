@@ -319,7 +319,8 @@
       </section>
 
       <section id="page-configuracoes" class="page hidden admin-only">
-        <div class="panel config-panel">
+        <div class="toolbar"><button class="btn secondary" data-config-tab="dados">Dados da empresa</button><button class="btn secondary" data-config-tab="cobranca">Mensagem de cobrança</button></div>
+        <div class="panel config-panel" data-config-panel="dados">
           <h3>Dados da empresa</h3>
           <p class="muted">Esses dados serão usados nos documentos de orçamento e ordem de serviço.</p>
           <form id="empresa-form">
@@ -338,6 +339,7 @@
             <div class="modal-actions"><button class="btn primary">Salvar configurações</button></div>
           </form>
         </div>
+        <div class="panel config-panel hidden" data-config-panel="cobranca"><h3>Mensagem de cobrança padrão</h3><p class="muted">Variáveis: {cliente}, {recibo}, {valor}, {vencimento}, {parcela}, {empresa}.</p><form id="cobranca-config-form"><label>Mensagem<textarea id="emp-cobranca" rows="10" required></textarea></label><div class="modal-actions"><button class="btn primary">Salvar mensagem</button></div></form></div>
       </section>
     
 <section id="page-catalogo-base" class="page hidden">

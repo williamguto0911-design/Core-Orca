@@ -57,7 +57,7 @@
           <div class="nav-submenu">
             <button class="nav-item nav-subitem" data-page="recibos" data-module="recibos">Recibos</button>
             <button class="nav-item nav-subitem" data-page="financeiro" data-module="financeiro">Financeiro</button>
-            <button class="nav-item nav-subitem" data-page="cobrancas" data-module="financeiro">Cobranças</button>
+            <button class="nav-item nav-subitem" data-page="notas-fiscais" data-module="notas_fiscais">Notas Fiscais</button><button class="nav-item nav-subitem" data-page="cobrancas" data-module="financeiro">Cobranças</button>
             <button class="nav-item nav-subitem" data-page="relatorios" data-module="relatorios">Relatórios</button>
           </div>
         </div>
@@ -204,7 +204,7 @@
         <div class="toolbar"><input id="financeiro-search" placeholder="Pesquisar lançamento, cliente ou status..."><button id="novo-lancamento" class="btn primary">+ Lançamento</button></div>
         <div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Descrição</th><th>Cliente</th><th>Vencimento</th><th>Valor</th><th>Pagamento</th><th>Status</th><th></th></tr></thead><tbody id="financeiro-table"></tbody></table></div>
       </section>
-      <section id="page-cobrancas" class="page hidden">
+      <section id="page-notas-fiscais" class="page hidden"><div class="page-header"><div><h1>Notas Fiscais</h1><p>Programação, documentos vinculados e histórico fiscal.</p></div><button class="btn primary" onclick="fiscalNova()">+ Nova programação</button></div><div class="panel"><p id="fiscal-aviso" class="muted">Emissão externa ainda não configurada. Nenhuma nota será transmitida automaticamente.</p><div class="toolbar"><input id="fiscal-busca" placeholder="Pesquisar cliente, documento ou status" oninput="fiscalRender()"><button class="btn secondary" onclick="fiscalLoad()">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>Programação</th><th>Documento</th><th>Cliente</th><th>Valor</th><th>Status</th><th>Nota / arquivos</th><th>Ações</th></tr></thead><tbody id="fiscal-rows"></tbody></table></div></div><div class="panel"><h3>Assinatura digital de documentos</h3><p>Vincule um PDF final a um orçamento, recibo, OS ou lista de materiais.</p><button class="btn secondary" onclick="fiscalAssinar()">Solicitar assinatura</button></div></section><section id="page-cobrancas" class="page hidden">
         <div class="toolbar"><input id="cobranca-search" placeholder="Pesquisar cobrança, cliente ou recibo..."><button id="nova-cobranca" class="btn primary">+ Nova cobrança</button></div>
         <div class="stats finance-stats"><article><span>Programadas</span><strong id="cob-programadas">0</strong></article><article><span>Prontas para envio</span><strong id="cob-prontas">0</strong></article><article><span>Enviadas</span><strong id="cob-enviadas">0</strong></article></div>
         <div class="table-wrap"><table><thead><tr><th>Data sugerida</th><th>Cliente</th><th>Recibo / Parcela</th><th>Valor</th><th>Status</th><th></th></tr></thead><tbody id="cobrancas-table"></tbody></table></div>
@@ -319,7 +319,7 @@
       </section>
 
       <section id="page-configuracoes" class="page hidden admin-only">
-        <div class="toolbar"><button class="btn secondary" data-config-tab="dados">Dados da empresa</button><button class="btn secondary" data-config-tab="cobranca">Mensagem de cobrança</button></div>
+        <div class="toolbar"><button class="btn secondary" data-config-tab="dados">Dados da empresa</button><button class="btn secondary" data-config-tab="cobranca">Mensagem de cobrança</button><button class="btn secondary" data-config-tab="certificado">Certificado digital</button></div>
         <div class="panel config-panel" data-config-panel="dados">
           <h3>Dados da empresa</h3>
           <p class="muted">Esses dados serão usados nos documentos de orçamento e ordem de serviço.</p>
@@ -339,7 +339,7 @@
             <div class="modal-actions"><button class="btn primary">Salvar configurações</button></div>
           </form>
         </div>
-        <div class="panel config-panel hidden" data-config-panel="cobranca"><h3>Mensagem de cobrança padrão</h3><p class="muted">Variáveis: {cliente}, {recibo}, {valor}, {vencimento}, {parcela}, {empresa}.</p><form id="cobranca-config-form"><label>Mensagem<textarea id="emp-cobranca" rows="10" required></textarea></label><div class="modal-actions"><button class="btn primary">Salvar mensagem</button></div></form></div>
+        <div class="panel config-panel hidden" data-config-panel="certificado"><h3>Fiscal e certificado digital — V057</h3><form id="fiscal-config-form"><div class="form-grid"><label>Emissor<input value="Emissor Nacional de NFS-e" readonly></label><label>UF<select id="fiscal-uf" required></select></label><label>Município<select id="fiscal-municipio" required></select></label><label>Regime tributário<select id="fiscal-regime" required><option value="MEI">MEI</option><option value="SN">Simples Nacional</option><option value="LP">Lucro Presumido</option><option value="LR">Lucro Real</option></select></label><label>Inscrição municipal<input id="fiscal-im"></label><label>Código nacional do serviço<input id="fiscal-ctn" required pattern="[0-9]{6}" maxlength="6"></label><label>Código municipal do serviço<input id="fiscal-ctm"></label><label>Ambiente<select id="fiscal-amb"><option value="restrita">Produção restrita (testes)</option><option value="producao">Produção (preferência, transmissão desativada)</option></select></label></div><div class="modal-actions"><button class="btn primary">Salvar dados fiscais</button></div></form><hr><h3>Certificado digital A1</h3><p id="fiscal-cert-status" class="muted">Consulte o estado do certificado.</p><form id="fiscal-cert-form"><div class="form-grid"><label>Arquivo A1 (.pfx / .p12)<input id="fiscal-cert-file" type="file" accept=".pfx,.p12" required></label><label>Senha do certificado<input id="fiscal-cert-password" type="password" autocomplete="off" required></label></div><div class="modal-actions"><button class="btn primary">Importar certificado</button><button type="button" class="btn secondary" onclick="fiscalCertStatus()">Consultar</button></div></form></div><div class="panel config-panel hidden" data-config-panel="cobranca"><h3>Mensagem de cobrança padrão</h3><p class="muted">Variáveis: {cliente}, {recibo}, {valor}, {vencimento}, {parcela}, {empresa}.</p><form id="cobranca-config-form"><label>Mensagem<textarea id="emp-cobranca" rows="10" required></textarea></label><div class="modal-actions"><button class="btn primary">Salvar mensagem</button></div></form></div>
       </section>
     
 <section id="page-catalogo-base" class="page hidden">
@@ -360,7 +360,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/signature_pad@5.0.4/dist/signature_pad.umd.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js"></script><script src="fiscal.js"></script>
   <script src="levantamento.js"></script>
 </body>
 </html>

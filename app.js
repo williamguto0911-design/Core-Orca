@@ -176,6 +176,7 @@ function renderCurrent(){
   if(currentPage==="relatorios")renderRelatorios();
   if(currentPage==="recibos")renderRecibos();
   if(currentPage==="cobrancas")renderCobrancas();
+ if(currentPage==="notas-fiscais")fiscalLoad();
   if(currentPage==="cargos")renderCargos();
   if(currentPage==="admin-plataforma"){renderSaasAdmin();refreshV054AdminStats()}
   if(currentPage==="unifilar")renderUnifilar();
@@ -348,7 +349,7 @@ function applyPermissions(){
  });
 
  document.querySelectorAll("[data-module]").forEach(el=>{
-   const allowed=!platform && !noAccess && commercialModuleEnabled(el.dataset.module) && (manager || can(el.dataset.module,"read"));
+   const allowed=(el.dataset.module!=="notas_fiscais" || manager) && !platform && !noAccess && commercialModuleEnabled(el.dataset.module) && (manager || can(el.dataset.module,"read"));
    el.classList.toggle("hidden",!allowed);
  });
 
@@ -390,13 +391,14 @@ function renderDashboard(){
   renderAlerts();
 }
 function navigate(page){
+ if(page==="notas-fiscais" && currentUserProfile?.tipo!=="gerente")return toast("Sem permissão.");
   if(!currentUserProfile?.is_platform_admin && (!commercialModuleEnabled(commercialPageKey(page)) || !commercialModuleEnabled(({cobrancas:"financeiro","reposicao-estoque":"estoque",levantamento:"unifilar"})[page]||commercialPageKey(page))))return toast("Módulo não contratado.");
   currentPage=page;document.querySelectorAll(".page").forEach(p=>p.classList.add("hidden"));$("page-"+page).classList.remove("hidden");
   document.querySelectorAll(".nav-item").forEach(b=>b.classList.toggle("active",b.dataset.page===page));
   refreshNavGroups();
   if(page==="notificacoes")setTimeout(()=>openNotificationSettings(),0);
   if(page==="cobrancas")loadCobrancas().then(renderCobrancas);
-  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cobrancas:"Cobranças",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Vertical",levantamento:"Levantamento em Obra",usuarios:"Usuários",configuracoes:"Configurações"}[page];
+  $("page-title").textContent={dashboard:"Dashboard",clientes:"Clientes",materiais:"Materiais","lista-materiais":"Lista de Materiais",servicos:"Serviços",estoque:"Estoque","reposicao-estoque":"Reposição de Estoque",orcamentos:"Orçamentos",os:"Ordens de Serviço",agenda:"Agenda",financeiro:"Financeiro",tecnicos:"Técnicos",fornecedores:"Fornecedores",compras:"Compras",relatorios:"Relatórios",recibos:"Recibos",cobrancas:"Cobranças","notas-fiscais":"Notas Fiscais",cargos:"Cargos e Permissões","admin-plataforma":"Empresas e Licenças",unifilar:"Esquema Vertical",levantamento:"Levantamento em Obra",usuarios:"Usuários",configuracoes:"Configurações"}[page];
   renderCurrent();$("sidebar").classList.remove("open");
 }
 
@@ -799,11 +801,11 @@ async function openProof(path){const {data,error}=await sb.storage.from("comprov
 async function viewRecibo(id){const r=recibos.find(x=>x.id===id);const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);openModal("Recibo "+r.numero,`<p><b>Cliente:</b> ${esc(r.clientes?.nome||"-")}</p><p><b>Total:</b> ${money(r.total)}</p><div class="table-wrap"><table><thead><tr><th>Item</th><th>Qtd.</th><th>Valor</th></tr></thead><tbody>${(itens||[]).map(i=>`<tr><td>${esc(i.descricao)}</td><td>${i.quantidade}</td><td>${money(i.quantidade*i.valor_unitario)}</td></tr>`).join("")}</tbody></table></div><h4>Pagamentos</h4><div class="table-wrap"><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Pagamento</th><th>Valor</th><th>Método</th><th>Status</th><th>Ações</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela}</td><td>${p.vencimento?new Date(p.vencimento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${p.data_pagamento?new Date(p.data_pagamento+"T12:00:00").toLocaleDateString("pt-BR"):"-"}</td><td>${money(p.valor)}</td><td>${esc(p.metodo_pagamento||"-")}</td><td>${p.status==="pago"?"Pago":"Pendente"}</td><td><button class="action-btn" onclick="paymentPopup('${p.id}','${id}',${p.status!=="pago"})">${p.status==="pago"?"Marcar pendente":"Marcar pago"}</button>${p.comprovante_path?` <button class="action-btn" onclick="openProof('${p.comprovante_path}')">Comprovante</button>`:""}</td></tr>`).join("")}</tbody></table></div><div class="modal-actions"><button class="btn secondary" onclick="closeModal()">Fechar</button><button class="btn secondary" onclick="gerenciarPagamentosRecibo('${id}')">Pagamentos / Parcelamento</button><button class="btn primary" onclick="printRecibo('${id}')">PDF / Imprimir</button></div>`)}
 async function printRecibo(id){const r=recibos.find(x=>x.id===id);if(!r)return;const [{data:itens},{data:pags}]=await Promise.all([sb.from("recibo_itens").select("*").eq("recibo_id",id).order("ordem"),sb.from("recibo_pagamentos").select("*").eq("recibo_id",id).order("parcela")]);const fmt=d=>d?new Date(d+"T12:00:00").toLocaleDateString("pt-BR"):"—";const pay=`<h3>Previsão de pagamentos e pagamentos realizados</h3><table><thead><tr><th>Parcela</th><th>Previsão de pagamento</th><th>Data em que foi pago</th><th>Valor</th><th>Status</th></tr></thead><tbody>${(pags||[]).map(p=>`<tr><td>${p.parcela||"—"}</td><td>${fmt(p.vencimento)}</td><td>${fmt(p.data_pagamento)}</td><td>${money(p.valor)}</td><td>${statusLabel(p.status)}</td></tr>`).join("")||'<tr><td colspan="5">Nenhuma previsão ou pagamento cadastrado.</td></tr>'}</tbody></table>`;printDocument(`Recibo ${r.numero}`,`${clientePDFHTML(clienteDoDocumento(r),"Dados cadastrais do pagador / cliente")}<p><b>Emissão:</b> ${fmt(r.data_emissao)}</p>`,itens||[],`<p class="total">Total: ${money(r.total)}</p>${pay}<p>${esc(r.observacoes||"")}</p>`)}
 
-const permissionModules=["clientes","materiais","lista_materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes","unifilar","levantamento","usuarios","cargos","notificacoes","admin_plataforma"];
+const permissionModules=["notas_fiscais","clientes","materiais","lista_materiais","servicos","estoque","orcamentos","os","agenda","financeiro","recibos","tecnicos","fornecedores","compras","relatorios","configuracoes","unifilar","levantamento","usuarios","cargos","notificacoes","admin_plataforma"];
 // Inclui todos os menus funcionais; a administração da plataforma permanece restrita.
 const commercialModules=["dashboard",...permissionModules.filter(x=>x!=="admin_plataforma"),"reposicao_estoque","cobrancas","importar_catalogo"];
-const moduleLabels={dashboard:"Dashboard",reposicao_estoque:"Reposição de Estoque",cobrancas:"Cobranças",importar_catalogo:"Permitir importar banco de dados padrão",unifilar:"Esquema Vertical",levantamento:"Levantamento em Obra",os:"Ordens de Serviço",cargos:"Cargos e Permissões"};
-const commercialPageKey=p=>({"lista-materiais":"lista_materiais","reposicao-estoque":"reposicao_estoque"}[p]||p);
+const moduleLabels={notas_fiscais:"Notas Fiscais",dashboard:"Dashboard",reposicao_estoque:"Reposição de Estoque",cobrancas:"Cobranças",importar_catalogo:"Permitir importar banco de dados padrão",unifilar:"Esquema Vertical",levantamento:"Levantamento em Obra",os:"Ordens de Serviço",cargos:"Cargos e Permissões"};
+const commercialPageKey=p=>({"notas-fiscais":"notas_fiscais","lista-materiais":"lista_materiais","reposicao-estoque":"reposicao_estoque"}[p]||p);
 let v054AdminStats={};
 async function refreshV054AdminStats(){
  if(!currentUserProfile?.is_platform_admin)return;

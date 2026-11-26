@@ -6,6 +6,41 @@ ns='http://www.sped.fazenda.gov.br/nfse'; ds='http://www.w3.org/2000/09/xmldsig#
 parser=E.XMLParser(resolve_entities=False,no_network=True,load_dtd=False,remove_blank_text=False)
 def q(n): return '{'+ns+'}'+n
 def d(n): return '{'+ds+'}'+n
+def diagnostico_xsd(error, tree):
+ # Only names declared in the local schema or fixed XML namespaces are logged.
+ # Never print error.message, XML values, attributes, or raw XPath.
+ names=set()
+ for f in schema.parent.rglob('*.xsd'):
+  try:
+   doc=E.parse(str(f),parser)
+   names.update(doc.xpath('//*[local-name()="element"]/@name'))
+  except (OSError,E.XMLSyntaxError):
+   pass
+ names.update(('DPS','infDPS','Signature','SignedInfo','Id'))
+ def safe(name):
+  return name if name in names and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]{0,79}',name) else 'DESCONHECIDO'
+ path=error.path or ''
+ nodes=[]
+ try:
+  nodes=tree.xpath(path,namespaces={'ds':ds,'nfse':ns}) if path else []
+ except E.XPathError:
+  pass
+ node=next((n for n in nodes if isinstance(n,E._Element)),None)
+ if node is None:
+  candidates=[n for n in tree.iter() if isinstance(n.tag,str) and n.sourceline==error.line]
+  if len(candidates)==1: node=candidates[0]
+ if node is not None:
+  parts=[safe(E.QName(n).localname) for n in reversed(list(node.iterancestors()))]+[safe(E.QName(node).localname)]
+  print('XSD_CAMINHO: '+ '/'.join(parts[-20:]),flush=True)
+ # Extract only schema-declared element names from structural diagnostics.
+ if error.type==1871:
+  tail=re.split(r'Expected is(?: one of)?',error.message,maxsplit=1)
+  if len(tail)==2:
+   expected=[safe(n) for n in re.findall(r'\{[^}]+\}([A-Za-z_][A-Za-z0-9_.-]*)',tail[1])]
+   if expected: print('XSD_ESPERADOS: '+','.join(dict.fromkeys(expected)),flush=True)
+ kind=error.type_name or 'UNKNOWN'
+ if re.fullmatch(r'[A-Z0-9_]{1,80}',kind): print('XSD_TIPO: '+kind,flush=True)
+
 stage='XML_LEITURA'
 try:
  root=E.parse(str(p/'dps.xml'),parser)
@@ -60,6 +95,7 @@ try:
  if not xsd.validate(signed):
   for e in list(xsd.error_log)[:10]:
    print('XSD_ERRO: '+str(e.type)+' LINHA: '+str(e.line),flush=True)
+   diagnostico_xsd(e,signed)
   raise ValueError('XSD')
  print('XSD: OK',flush=True)
  (p/'id.txt').write_text(ident)

@@ -1,4 +1,4 @@
-import sys, pathlib, re, subprocess, resource, shutil
+import sys, pathlib, re, subprocess, resource, shutil, hashlib, base64, hmac
 from lxml import etree as E
 resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 p=pathlib.Path(sys.argv[1]); schema=pathlib.Path(sys.argv[2]).resolve()
@@ -28,34 +28,32 @@ try:
  E.SubElement(ref,d('DigestMethod'),Algorithm='http://www.w3.org/2001/04/xmlenc#sha256'); E.SubElement(ref,d('DigestValue')); E.SubElement(s,d('SignatureValue')); E.SubElement(E.SubElement(E.SubElement(s,d('KeyInfo')),d('X509Data')),d('X509Certificate'))
  root.write(str(p/'template.xml'),encoding='UTF-8',xml_declaration=True)
  print('XML_TEMPLATE: OK',flush=True)
- def run(args):
-  if not shutil.which(args[0]):
-   print('XMLSEC_CATEGORIA: EXECUTAVEL_AUSENTE',flush=True)
-   raise RuntimeError('XMLSEC')
-  try:
-   result=subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=20)
-  except subprocess.TimeoutExpired:
-   print('XMLSEC_CATEGORIA: TIMEOUT',flush=True); raise
+ def canon(node):
+  return E.tostring(node,method='c14n',exclusive=False,with_comments=False)
+ def openssl(args, payload=None):
+  result=subprocess.run(['openssl',*args],input=payload,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=20)
   if result.returncode:
-   err=result.stderr.lower()
-   print('XMLSEC_EXIT: '+str(result.returncode),flush=True)
-   patterns=[(b'failed to find node','NODE'),(b'xpointer','REFERENCE'),(b'key is not found','KEY'),(b'failed to load','LOAD'),(b'digest','DIGEST'),(b'certificate','CERT'),(b'unknown','OPTION'),(b'unsupported','UNSUPPORTED'),(b'crypto','CRYPTO'),(b'permission denied','PERMISSION'),(b'error=','INTERNAL'),(b'failed','GENERIC')]
-   found=[code for needle,code in patterns if needle in err]
-   for code in found or ['UNCLASSIFIED']:
-    print('XMLSEC_CATEGORIA: '+code,flush=True)
-   # Only emit known safe function names, never raw stderr or XML.
-   for name in sorted(set(re.findall(rb'func=([A-Za-z0-9_]{1,100});',result.stderr))):
-    if name.startswith(b'xmlSec'):
-     print('XMLSEC_FUNCAO: '+name.decode('ascii'),flush=True)
-   for code in sorted(set(re.findall(rb'error=([0-9]{1,5})(?:;|:)',result.stderr))):
-    print('XMLSEC_ERRO_NUM: '+code.decode('ascii'),flush=True)
-   raise RuntimeError('XMLSEC')
+   print('OPENSSL_EXIT: '+str(result.returncode),flush=True)
+   raise RuntimeError('OPENSSL')
+  return result.stdout
  stage='ASSINATURA'
- print('XMLSEC_DISPONIVEL: '+('SIM' if shutil.which('xmlsec1') else 'NAO'),flush=True)
- run(['xmlsec1','--sign','--id-attr:Id',ns+':infDPS','--privkey-pem',str(p/'key.pem')+','+str(p/'cert.pem'),'--output',str(p/'signed.xml'),str(p/'template.xml')])
+ print('MOTOR_ASSINATURA: OPENSSL',flush=True)
+ # infDPS does not contain Signature: enveloped transform is a no-op.
+ ref.find(d('DigestValue')).text=base64.b64encode(hashlib.sha256(canon(info)).digest()).decode('ascii')
+ cert=openssl(['x509','-in',str(p/'cert.pem'),'-outform','DER'])
+ s.find('.//'+d('X509Certificate')).text=base64.b64encode(cert).decode('ascii')
+ signature=openssl(['dgst','-sha256','-sign',str(p/'key.pem'),'-sigopt','rsa_padding_mode:pkcs1'],canon(si))
+ s.find(d('SignatureValue')).text=base64.b64encode(signature).decode('ascii')
+ root.write(str(p/'signed.xml'),encoding='UTF-8',xml_declaration=True)
  print('ASSINATURA: OK',flush=True)
  stage='VERIFICACAO_ASSINATURA'
- run(['xmlsec1','--verify','--id-attr:Id',ns+':infDPS','--pubkey-cert-pem',str(p/'cert.pem'),'--insecure',str(p/'signed.xml')]) # local signature check only, not trust validation; mTLS retains server verification
+ check=E.parse(str(p/'signed.xml'),parser).getroot()
+ ci=check.find(q('infDPS')); cs=check.find(d('Signature')); csi=cs.find(d('SignedInfo'))
+ expected=base64.b64decode(csi.find(d('Reference')).findtext(d('DigestValue')),validate=True)
+ assert hmac.compare_digest(expected,hashlib.sha256(canon(ci)).digest())
+ (p/'signature.bin').write_bytes(base64.b64decode(cs.findtext(d('SignatureValue')),validate=True))
+ (p/'public.pem').write_bytes(openssl(['x509','-in',str(p/'cert.pem'),'-pubkey','-noout']))
+ openssl(['dgst','-sha256','-verify',str(p/'public.pem'),'-signature',str(p/'signature.bin'),'-sigopt','rsa_padding_mode:pkcs1'],canon(csi))
  print('VERIFICACAO_ASSINATURA: OK',flush=True)
  stage='XSD_VALIDACAO'
  signed=E.parse(str(p/'signed.xml'),parser)

@@ -1,4 +1,4 @@
-import sys, pathlib, re, subprocess, resource
+import sys, pathlib, re, subprocess, resource, shutil
 from lxml import etree as E
 resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 p=pathlib.Path(sys.argv[1]); schema=pathlib.Path(sys.argv[2]).resolve()
@@ -29,14 +29,29 @@ try:
  root.write(str(p/'template.xml'),encoding='UTF-8',xml_declaration=True)
  print('XML_TEMPLATE: OK',flush=True)
  def run(args):
-  result=subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=20)
+  if not shutil.which(args[0]):
+   print('XMLSEC_CATEGORIA: EXECUTAVEL_AUSENTE',flush=True)
+   raise RuntimeError('XMLSEC')
+  try:
+   result=subprocess.run(args,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,timeout=20)
+  except subprocess.TimeoutExpired:
+   print('XMLSEC_CATEGORIA: TIMEOUT',flush=True); raise
   if result.returncode:
    err=result.stderr.lower()
-   for needle,code in [(b'failed to find node','NODE'),(b'xpointer','REFERENCE'),(b'key is not found','KEY'),(b'failed to load','LOAD'),(b'digest','DIGEST'),(b'certificate','CERT'),(b'unknown','OPTION')]:
-    if needle in err:
-     print('XMLSEC_CATEGORIA: '+code,flush=True); break
+   print('XMLSEC_EXIT: '+str(result.returncode),flush=True)
+   patterns=[(b'failed to find node','NODE'),(b'xpointer','REFERENCE'),(b'key is not found','KEY'),(b'failed to load','LOAD'),(b'digest','DIGEST'),(b'certificate','CERT'),(b'unknown','OPTION'),(b'unsupported','UNSUPPORTED'),(b'crypto','CRYPTO'),(b'permission denied','PERMISSION'),(b'error=','INTERNAL'),(b'failed','GENERIC')]
+   found=[code for needle,code in patterns if needle in err]
+   for code in found or ['UNCLASSIFIED']:
+    print('XMLSEC_CATEGORIA: '+code,flush=True)
+   # Only emit known safe function names, never raw stderr or XML.
+   for name in sorted(set(re.findall(rb'func=([A-Za-z0-9_]{1,100});',result.stderr))):
+    if name.startswith(b'xmlSec'):
+     print('XMLSEC_FUNCAO: '+name.decode('ascii'),flush=True)
+   for code in sorted(set(re.findall(rb'error=([0-9]{1,5})(?:;|:)',result.stderr))):
+    print('XMLSEC_ERRO_NUM: '+code.decode('ascii'),flush=True)
    raise RuntimeError('XMLSEC')
  stage='ASSINATURA'
+ print('XMLSEC_DISPONIVEL: '+('SIM' if shutil.which('xmlsec1') else 'NAO'),flush=True)
  run(['xmlsec1','--sign','--id-attr:Id',ns+':infDPS','--privkey-pem',str(p/'key.pem')+','+str(p/'cert.pem'),'--output',str(p/'signed.xml'),str(p/'template.xml')])
  print('ASSINATURA: OK',flush=True)
  stage='VERIFICACAO_ASSINATURA'
@@ -50,5 +65,6 @@ try:
   raise ValueError('XSD')
  print('XSD: OK',flush=True)
  (p/'id.txt').write_text(ident)
-except Exception:
+except Exception as exc:
+ print('PYTHON_TIPO: '+type(exc).__name__,flush=True)
  print(stage+': FALHA',flush=True); sys.exit(1)

@@ -1,4 +1,4 @@
-/* V057.1 — fila fiscal preparatória, sem transmissão externa */
+/* V057.2 — fila fiscal preparatória, sem transmissão externa */
 let fiscalRows=[];
 const fiscalSources=()=>({orcamento:orcamentos,recibo:recibos,os:ordens,lista:listasMateriais});
 const fiscalLabels={orcamento:'Orçamento',recibo:'Recibo',os:'OS',lista:'Lista de materiais'};
@@ -9,7 +9,7 @@ async function fiscalCall(action,body={}){
     const status=ctx?.status;
     let detail='';
     if(typeof ctx?.json==='function'){
-      try{const payload=await ctx.json();if(typeof payload?.error==='string')detail=payload.error;}catch{}
+      try{const payload=await ctx.json();if(typeof payload?.error==='string')detail=payload.error+(typeof payload.code==='string'?' ['+payload.code+']':'');}catch{}
     }
     const fallback={400:'Dados inválidos. Confira os campos e o certificado.',401:'Sessão inválida. Entre novamente.',403:'Sem permissão para esta operação.',404:'Função fiscal ou registro não encontrado.',429:'Muitas solicitações. Tente novamente.',500:'Falha interna na operação fiscal.',503:'Serviço fiscal indisponível ou chave de criptografia não configurada.'};
     throw Error((detail||fallback[status]||'Não foi possível comunicar com o serviço fiscal.')+(status?' (HTTP '+status+')':''));

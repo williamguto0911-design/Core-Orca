@@ -1,33 +1,10 @@
 import {createSecureContext} from 'node:tls';
 import https from 'node:https';
-const targets = [
- ['restrita','https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional/docs/index'],
- ['producao','https://sefin.nfse.gov.br/SefinNacional/docs/index']
-];
-function probe(url, credentials={}) {
- return new Promise(resolve=>{
-  let req;
-  const finish=(v)=>{clearTimeout(timer);resolve(v)};
-  const timer=setTimeout(()=>{req?.destroy();finish('TIMEOUT')},15000);
-  try {
-   req=https.get(url,{...credentials,agent:false,minVersion:'TLSv1.2',maxVersion:'TLSv1.2',rejectUnauthorized:true,ALPNProtocols:['http/1.1']},res=>{res.resume();finish(`HTTP ${res.statusCode}`)});
-   req.on('error',e=>finish(/^[A-Z0-9_]+$/.test(e.code||'')?e.code:'ERRO_TLS_HTTP'));
-  } catch {finish('ERRO_CLIENTE')}
- });
-}
-async function main(){
- const {SUPABASE_URL:url,CORE_ORCA_WORKER_TOKEN:token}=process.env;
- if(!url||!/^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(url)||! /^[a-f0-9]{64}$/i.test(token||''))throw Error('CONFIG');
- const endpoint=new URL('/functions/v1/core-orca-fiscal-worker',url);
- const r=await fetch(endpoint,{method:'POST',headers:{'x-fiscal-token':token},redirect:'error',signal:AbortSignal.timeout(15000)});
- if(!r.ok)throw Error('SUPABASE_HTTP_'+r.status);
- let pfx;
- try {
-  const parsed=await r.json();pfx=Buffer.from(parsed.pfx,'base64');const credentials={pfx,passphrase:parsed.senha};
-  createSecureContext(credentials);console.log('CERT_RECEIVED / PKCS12: OK');
-  let ok=true;
-  for(const [name,target] of targets){const baseline=await probe(target);const authenticated=await probe(target,credentials);console.log(`${name}: sem certificado ${baseline}; com certificado ${authenticated}`);if(baseline!=='HTTP 403'||authenticated!=='HTTP 200')ok=false;}
-  console.log(ok?'Acesso autenticado à documentação confirmado por comparação.':'Diagnóstico inconclusivo ou falha.');if(!ok)process.exitCode=1;
- } finally {pfx?.fill(0);}
-}
-main().catch(e=>{const m=String(e.message);console.error(/^(CONFIG|CERT_STATUS|CERT_FORMAT|SUPABASE_HTTP_\d+)$/.test(m)?m:'Falha na preparação ou leitura do certificado; detalhes omitidos.');process.exitCode=1;});
+import {spawnSync} from 'node:child_process';
+const targets=[['restrita','https://sefin.producaorestrita.nfse.gov.br/API/SefinNacional/docs/index'],['producao','https://sefin.nfse.gov.br/SefinNacional/docs/index']];
+const fail=code=>{throw new Error(code)};
+function probe(url,credentials={}){return new Promise(resolve=>{let req;const finish=v=>{clearTimeout(timer);resolve(v)};const timer=setTimeout(()=>{finish('TIMEOUT');req?.destroy()},15000);try{req=https.get(url,{...credentials,agent:false,minVersion:'TLSv1.2',maxVersion:'TLSv1.2',rejectUnauthorized:true,ALPNProtocols:['http/1.1']},res=>{res.resume();finish(`HTTP ${res.statusCode}`)});req.on('error',e=>finish(['ECONNRESET','ETIMEDOUT','ENOTFOUND','EPROTO','ERR_SSL_UNSAFE_LEGACY_RENEGOTIATION_DISABLED','UNABLE_TO_VERIFY_LEAF_SIGNATURE','CERT_HAS_EXPIRED'].includes(e.code)?e.code:'ERRO_TLS_HTTP'));}catch{finish('ERRO_CLIENTE')}})}
+// Password via environment of the isolated child, never command arguments or logs.
+function convert(pfx,password,legacy){const r=spawnSync('openssl',['pkcs12',...(legacy?['-legacy']:[]),'-nodes','-passin','env:PFX_PASSWORD'],{input:pfx,encoding:null,timeout:10000,maxBuffer:4*1024*1024,env:{PATH:process.env.PATH,PFX_PASSWORD:password}});try{if(r.status!==0||!r.stdout)return null;const pem=r.stdout.toString('ascii');const keys=pem.match(/-----BEGIN (?:RSA |EC )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC )?PRIVATE KEY-----/g)||[];const certs=pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g)||[];if(keys.length!==1||!certs.length)return null;return {key:keys[0],cert:certs.join('\n')};}finally{r.stdout?.fill(0);r.stderr?.fill(0)}}
+async function main(){let stage='CONFIG',pfx;try{console.log('V058.7 / Node '+process.versions.node+' / OpenSSL '+process.versions.openssl);const {SUPABASE_URL:url,CORE_ORCA_WORKER_TOKEN:token}=process.env;if(!/^https:\/\/[a-z0-9]+\.supabase\.co\/?$/.test(url||'')||! /^[a-f0-9]{64}$/i.test(token||''))fail('CONFIG');stage='SUPABASE_REDE';const r=await fetch(new URL('/functions/v1/core-orca-fiscal-worker',url),{method:'POST',headers:{'x-fiscal-token':token},redirect:'error',signal:AbortSignal.timeout(15000)});console.log('SUPABASE_HTTP_'+r.status);if(!r.ok)fail('SUPABASE_HTTP');stage='JSON';const parsed=await r.json();stage='CAMPOS';if(typeof parsed.pfx!=='string'||typeof parsed.senha!=='string')fail(stage);console.log('CAMPOS: OK');stage='BASE64';const b=parsed.pfx;if(!/^[A-Za-z0-9+/]+={0,2}$/.test(b)||b.length%4!==0||b.length>8*1024*1024)fail(stage);pfx=Buffer.from(b,'base64');if(pfx.toString('base64')!==b||pfx[0]!==0x30)fail(stage);console.log('BASE64: OK');stage='PKCS12';let credentials={pfx,passphrase:parsed.senha};try{createSecureContext(credentials);console.log('PKCS12_NATIVO: OK')}catch(e){console.log('PKCS12_NATIVO: '+(['ERR_OSSL_EVP_UNSUPPORTED','ERR_OSSL_PKCS12_MAC_VERIFY_FAILURE'].includes(e.code)?e.code:'FALHA'));credentials=null;for(const legacy of [false,true]){const label=legacy?'OPENSSL_LEGACY':'OPENSSL_PADRAO';const candidate=convert(pfx,parsed.senha,legacy);if(candidate){try{createSecureContext(candidate);credentials=candidate;console.log(label+': OK');break}catch{}}console.log(label+': FALHA')}if(!credentials)fail(stage)}stage='TLS';let ok=true;for(const [name,target] of targets){const a=await probe(target),b=await probe(target,credentials);console.log(`${name}: sem certificado ${a}; com certificado ${b}`);if(a!=='HTTP 403'||b!=='HTTP 200')ok=false}console.log(ok?'Acesso autenticado à documentação confirmado por comparação.':'Diagnóstico inconclusivo ou falha.');if(!ok)process.exitCode=1;}catch{console.error('FALHA_ETAPA: '+stage);process.exitCode=1}finally{pfx?.fill(0)}}
+main();

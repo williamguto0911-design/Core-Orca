@@ -1,8 +1,22 @@
-/* V057 — fila fiscal preparatória, sem transmissão externa */
+/* V057.1 — fila fiscal preparatória, sem transmissão externa */
 let fiscalRows=[];
 const fiscalSources=()=>({orcamento:orcamentos,recibo:recibos,os:ordens,lista:listasMateriais});
 const fiscalLabels={orcamento:'Orçamento',recibo:'Recibo',os:'OS',lista:'Lista de materiais'};
-async function fiscalCall(action,body={}){const {data,error}=await sb.functions.invoke('core-orca-fiscal',{body:{action,...body}});if(error||data?.error)throw Error(data?.error||error.message);return data;}
+async function fiscalCall(action,body={}){
+  const {data,error}=await sb.functions.invoke('core-orca-fiscal',{body:{action,...body}});
+  if(error){
+    const ctx=error.context;
+    const status=ctx?.status;
+    let detail='';
+    if(typeof ctx?.json==='function'){
+      try{const payload=await ctx.json();if(typeof payload?.error==='string')detail=payload.error;}catch{}
+    }
+    const fallback={400:'Dados inválidos. Confira os campos e o certificado.',401:'Sessão inválida. Entre novamente.',403:'Sem permissão para esta operação.',404:'Função fiscal ou registro não encontrado.',429:'Muitas solicitações. Tente novamente.',500:'Falha interna na operação fiscal.',503:'Serviço fiscal indisponível ou chave de criptografia não configurada.'};
+    throw Error((detail||fallback[status]||'Não foi possível comunicar com o serviço fiscal.')+(status?' (HTTP '+status+')':''));
+  }
+  if(data?.error)throw Error(data.error);
+  return data;
+}
 async function fiscalLoad(){fiscalRows=[];fiscalRender();try{const {data,error}=await sb.from('fiscal_notas').select('*').order('programada_para',{ascending:false});if(error)throw error;fiscalRows=data||[];fiscalRender()}catch(e){$('fiscal-rows').textContent='Não foi possível carregar: '+e.message}}
 function fiscalRender(){const q=$('fiscal-busca').value; $('fiscal-rows').innerHTML=fiscalRows.filter(r=>smartSearch(r,q)).map(r=>`<tr><td>${esc(new Date(r.programada_para).toLocaleString('pt-BR'))}</td><td>${esc(fiscalLabels[r.origem_tipo]||r.origem_tipo)} ${esc(r.origem_numero)}</td><td>${esc(r.cliente)}</td><td>${money(r.valor)}</td><td>${esc(r.status)}</td><td>${esc(r.numero_nota||'—')}</td><td>${r.status==='aguardando_integracao'&&currentUserProfile?.tipo==='gerente'?`<button class="action-btn" onclick="fiscalCancelar('${r.id}')">Cancelar programação</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7">Nenhuma programação registrada.</td></tr>'}
 function fiscalSelect(includeList=false){return Object.entries(fiscalSources()).filter(([k])=>includeList||k!=='lista').map(([k,rows])=>`<optgroup label="${fiscalLabels[k]}">${rows.map(r=>`<option value="${k}:${esc(r.id)}">${esc(r.numero||r.nome||r.id)} — ${esc(r.clientes?.nome||'')}</option>`).join('')}</optgroup>`).join('')}

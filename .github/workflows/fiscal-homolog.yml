@@ -1,11 +1,6 @@
-name: Core Orca Fiscal V059.0 - Homologacao
+name: Core Orca Fiscal V059.1 - Homologacao
 on:
   workflow_dispatch:
-    inputs:
-      enviar:
-        description: 'Transmitir DPS de teste (desmarcado = apenas validar)'
-        type: boolean
-        default: false
 permissions:
   contents: read
 concurrency:
@@ -27,5 +22,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           CORE_ORCA_HOMOLOG_TOKEN: ${{ secrets.CORE_ORCA_HOMOLOG_TOKEN }}
-          FISCAL_ENVIAR: ${{ inputs.enviar && 'SIM' || 'NAO' }}
+          FISCAL_ENVIAR: 'NAO'
         run: node fiscal-worker/homolog.mjs

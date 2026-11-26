@@ -55,6 +55,44 @@ try:
  stage='XSD_CARREGAMENTO'
  xsd=E.XMLSchema(E.parse(str(schema),parser))
  print('XSD_CARREGAMENTO: OK',flush=True)
+ stage='XML_ADEQUACAO'
+ # Restricted environment only: regular DPS issued by the provider.
+ if info.findtext(q('tpEmit'))!='1': raise ValueError('EMITENTE')
+ serie=info.find(q('serie')); loc=info.find(q('cLocEmi')); num=info.findtext(q('nDPS'),'')
+ if serie is None or loc is None or not re.fullmatch(r'[1-9][0-9]{0,14}',num): raise ValueError('CAMPOS')
+ if not re.fullmatch(r'[0-9]{1,4}|[0-8][0-9]{4}',serie.text or ''):
+  serie.text='1' # Explicit test-only fallback, not a production numbering policy.
+  print('AJUSTE_SERIE: OK',flush=True)
+ if info.find(q('finNFSe')) is None:
+  fin=E.Element(q('finNFSe')); fin.text='0'
+  anchor=info.find(q('chNFSeRej'))
+  info.insert(info.index(anchor if anchor is not None else loc),fin)
+  print('AJUSTE_FINNFSE: OK',flush=True)
+ if info.find(q('indDest')) is None:
+  if info.find(q('dest')) is not None: raise ValueError('DESTINATARIO')
+  # Test assumption: no distinct recipient is specified in the source DPS.
+  anchor=next((info.find(q(n)) for n in ('interm','serv') if info.find(q(n)) is not None),None)
+  if anchor is None: raise ValueError('CAMPOS')
+  dest=E.Element(q('indDest')); dest.text='0'; info.insert(info.index(anchor),dest)
+  print('AJUSTE_INDDEST: OK',flush=True)
+ # Preserve issuer identity, and refuse inconsistent municipality or tax ID.
+ prest=info.find(q('prest')); cnpj=prest.findtext(q('CNPJ'),'') if prest is not None else ''; cpf=prest.findtext(q('CPF'),'') if prest is not None else ''
+ if re.fullmatch(r'[0-9]{14}',cnpj) and not cpf: federal='2'+cnpj
+ elif re.fullmatch(r'[0-9]{11}',cpf) and not cnpj: federal='1'+cpf.zfill(14)
+ else: raise ValueError('INSCRICAO')
+ municipio=loc.text or ''
+ if not re.fullmatch(r'[0-9]{7}',municipio) or ident[:25]!='DPS'+municipio+federal: raise ValueError('IDENTIDADE')
+ new_id='DPS'+municipio+federal+serie.text.zfill(5)+num.zfill(15)
+ if new_id!=ident:
+  ident=new_id; info.set('Id',ident); print('AJUSTE_ID: OK',flush=True)
+ print('XML_ADEQUACAO: OK',flush=True)
+ stage='XSD_PRE_VALIDACAO'
+ if not xsd.validate(root):
+  for e in list(xsd.error_log)[:10]:
+   print('XSD_ERRO: '+str(e.type)+' LINHA: '+str(e.line),flush=True)
+   diagnostico_xsd(e,root)
+  raise ValueError('XSD')
+ print('XSD_PRE_VALIDACAO: OK',flush=True)
  stage='XML_TEMPLATE'
  s=E.SubElement(r,d('Signature'),nsmap={'ds':ds}); si=E.SubElement(s,d('SignedInfo'))
  E.SubElement(si,d('CanonicalizationMethod'),Algorithm='http://www.w3.org/TR/2001/REC-xml-c14n-20010315'); E.SubElement(si,d('SignatureMethod'),Algorithm='http://www.w3.org/2001/04/xmldsig-more#rsa-sha256')
